@@ -1,0 +1,77 @@
+# ==========================
+# ARCHIVOS DEL SISTEMA
+# ==========================
+.DS_Store
+Thumbs.db
+
+# ==========================
+# PYTHON / DJANGO
+# ==========================
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+*.so
+
+# Entorno virtual
+venv/
+ENV/
+env/
+
+# Archivos de migraciones compilados
+*/migrations/__pycache__/
+*/migrations/*.pyc
+
+# ==========================
+# CONFIGURACIÓN / SECRETOS
+# ==========================
+.env
+*.env
+*.secret
+
+# ==========================
+# LOGS Y TEMPORALES
+# ==========================
+*.log
+logs/
+*.bak
+*.tmp
+*.swp
+*.swo
+
+# ==========================
+# DJANGO ESPECÍFICO
+# ==========================
+db.sqllite3
+media/            # archivos subidos
+staticfiles/      # archivos estáticos recolectados
+*.pot
+*.pyc
+*.mo
+/db.sqlite3-journal
+
+# ==========================
+# DEPENDENCIAS
+# ==========================
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ==========================
+# HERRAMIENTAS / TESTS
+# ==========================
+.tox/
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+nosetests.xml
+coverage.xml
+
+# ==========================
+# IDEs
+# ==========================
+.vscode/
+.idea/
