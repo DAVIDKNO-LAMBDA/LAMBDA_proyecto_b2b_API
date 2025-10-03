@@ -6,15 +6,16 @@ from rest_framework_simplejwt.views import (
 )
 
 urlpatterns = [
-    # Panel de administración de Django
+    # Admin de Django
     path("admin/", admin.site.urls),
 
-    # Rutas locales
+    # Endpoints de Empresas y Áreas
     path("api/", include("Empresas.urls")),
+
+    # Endpoints de Usuarios
     path("api/", include("Usuarios.urls")),
 
-    # Autenticación con JWT
+    # Autenticación JWT
     path("api/auth/login/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("api/auth/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
-    
 ]

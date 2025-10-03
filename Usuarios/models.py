@@ -1,62 +1,79 @@
-import uuid
-from datetime import timedelta
-from django.contrib.auth.models import AbstractUser
 from django.db import models
-from django.utils import timezone
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
+from Empresas.models import Empresa, Area
 from Base.models import BaseModel
-from Empresas.models import Empresa
 
-class Usuario(AbstractUser, BaseModel):
-    empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, null=True, blank=True)
-    email = models.EmailField(verbose_name="Correo")
-    celular = models.CharField(max_length=20, blank=True, null=True)
-    cargo = models.CharField(max_length=100, blank=True, null=True)
-    area = models.CharField(max_length=100, blank=True, null=True)
 
-    ROL_CHOICES = [
-        ("admin_sistema", "Admin del Sistema"),
-        ("admin_empresa", "Admin de Empresa"),
-        ("jefe_area", "Jefe de Área"),
-        ("validador", "Validador"),
-        ("empleado", "Empleado"),
-        ("coordinador_lambda", "Coordinador Lambda"),
-        ("director_lambda", "Director Lambda"),
-        ("financiera_lambda", "Financiera Lambda"),
-    ]
-    rol = models.CharField(max_length=50, choices=ROL_CHOICES, default="empleado")
+class UsuarioManager(BaseUserManager):
+    def create_user(self, email, nombres, apellidos, cargo, empresa, area=None, password=None, **extra_fields):
+        if not email:
+            raise ValueError("El usuario debe tener un correo electrónico")
+        email = self.normalize_email(email)
+        user = self.model(
+            email=email,
+            nombres=nombres,
+            apellidos=apellidos,
+            cargo=cargo,
+            empresa=empresa,
+            area=area,
+            **extra_fields
+        )
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, email, nombres, apellidos, cargo, empresa=None, area=None, password=None, **extra_fields):
+        extra_fields.setdefault("is_staff", True)
+        extra_fields.setdefault("is_superuser", True)
+        return self.create_user(email, nombres, apellidos, cargo, empresa, area, password, **extra_fields)
+
+
+class Usuario(AbstractBaseUser, PermissionsMixin, BaseModel):
+    nombres = models.CharField(max_length=255, verbose_name="Nombres")
+    apellidos = models.CharField(max_length=255, verbose_name="Apellidos")
+    email = models.EmailField(unique=True, verbose_name="Correo electrónico")
+    celular = models.CharField(max_length=10, blank=True, null=True, verbose_name="Número de celular")
+    cargo = models.CharField(max_length=255, verbose_name="Cargo")
+
+    empresa = models.ForeignKey(
+        Empresa,
+        on_delete=models.CASCADE,
+        related_name="usuarios",
+        verbose_name="Empresa"
+    )
+
+    area = models.ForeignKey(
+        Area,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="usuarios",
+        verbose_name="Área"
+    )
+
+    is_active = models.BooleanField(default=True, verbose_name="Activo")
+    is_staff = models.BooleanField(default=False, verbose_name="Es staff")
+
+    USERNAME_FIELD = "email"
+    REQUIRED_FIELDS = ["nombres", "apellidos", "cargo", "empresa", "area"]
+
+    objects = UsuarioManager()
 
     class Meta:
-        db_table = "usuarios_usuario"
-        constraints = [
-            models.UniqueConstraint(fields=["empresa", "email"], name="uq_usuario_empresa_email"),
+        verbose_name = "Usuario"
+        verbose_name_plural = "Usuarios"
+        db_table = "usuarios"
+        permissions = [
+            ("es_admin_empresa", "Es Administrador de Empresa"),
+            ("es_jefe_area", "Es Jefe de Área"),
+            ("valida_financiero", "Validador Financiero"),
+            ("solicita_compra", "Empleado solicitante"),
+            ("coordina_lambda", "Coordinador Lambda"),
+            ("dirige_lambda", "Director Lambda"),
+            ("abastece_lambda", "Área de Abastecimiento de Lambda"),
+            ("financiero_lambda", "Financiero Lambda"),
         ]
 
-class ActivationToken(BaseModel):
-    user = models.ForeignKey("Usuario", on_delete=models.CASCADE, related_name="activation_tokens")
-    token = models.CharField(max_length=64, unique=True, default=lambda: uuid.uuid4().hex)
-    expires_at = models.DateTimeField()
-    used_at = models.DateTimeField(null=True, blank=True)
-
-    class Meta:
-        db_table = "usuarios_activation_token"
-
-    @classmethod
-    def create_for_user(cls, user, hours_valid=72):
-        return cls.objects.create(
-            user=user,
-            expires_at=timezone.now() + timedelta(hours=hours_valid),
-        )
-
-    @property
-    def is_valid(self):
-        return self.used_at is None and timezone.now() < self.expires_at
-
-class EmpleadoAudit(BaseModel):
-    empleado = models.ForeignKey(Usuario, on_delete=models.CASCADE, related_name="auditorias")
-    modificado_por = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True, related_name="modificaciones_realizadas")
-    comentario = models.TextField(blank=True, null=True)
-
-    class Meta:
-        db_table = "usuarios_empleado_audit"
-        verbose_name = "Auditoría de Empleado"
-        verbose_name_plural = "Auditorías de Empleados" 
+    def __str__(self):
+        return f"{self.nombres} {self.apellidos}".title()
+    

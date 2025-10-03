@@ -2,54 +2,39 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
 from django.shortcuts import get_object_or_404
-from .models import Usuario, EmpleadoAudit, ActivationToken
-from .serializers import UsuarioSerializer, EmpleadoCreateSerializer, EmpleadoUpdateSerializer, ActivacionSerializer
-#from Base.utils import enviar_correo_activacion
+from .models import Usuario
+from .serializers import UsuarioSerializer, UsuarioCreateSerializer, UsuarioUpdateSerializer
+from .decorators import requiere_permiso
 
-class ActivateAccount(APIView):
-    permission_classes = [permissions.AllowAny]
-
-    def post(self, request):
-        serializer = ActivacionSerializer(data=request.data)
-        if serializer.is_valid():
-            user = serializer.save()
-            return Response(UsuarioSerializer(user).data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-class EmpleadosList(APIView):
+class UsuarioList(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        qs = Usuario.objects.filter(empresa=request.user.empresa).exclude(pk=request.user.pk)
-        estado = request.query_params.get("estado")
-        area = request.query_params.get("area")
-        if estado:
-            qs = qs.filter(estado=estado.lower() in ["true","1","activo"])
-        if area:
-            qs = qs.filter(area__iexact=area)
-        qs = qs.order_by(request.query_params.get("ordering","first_name"))
-        return Response(UsuarioSerializer(qs, many=True).data)
+        usuarios = Usuario.objects.filter(empresa=request.user.empresa)
+        serializer = UsuarioSerializer(usuarios, many=True)
+        return Response(serializer.data)
 
-class EmpleadoCreate(APIView):
+
+class UsuarioCreate(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
+    @requiere_permiso("Usuarios.es_admin_empresa")
     def post(self, request):
-        serializer = EmpleadoCreateSerializer(data=request.data, context={"request": request})
+        serializer = UsuarioCreateSerializer(data=request.data)
         if serializer.is_valid():
-            empleado = serializer.save()
-            token = ActivationToken.objects.filter(user=empleado).last()
-            #enviar_correo_activacion(empleado.email, token.token)
-            return Response(UsuarioSerializer(empleado).data, status=status.HTTP_201_CREATED)
+            usuario = serializer.save()
+            return Response(UsuarioSerializer(usuario).data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-class EmpleadoUpdate(APIView):
+
+class UsuarioUpdate(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
+    @requiere_permiso("Usuarios.es_admin_empresa")
     def put(self, request, pk):
-        empleado = get_object_or_404(Usuario, pk=pk, empresa=request.user.empresa)
-        serializer = EmpleadoUpdateSerializer(empleado, data=request.data, partial=True)
+        usuario = get_object_or_404(Usuario, pk=pk, empresa=request.user.empresa)
+        serializer = UsuarioUpdateSerializer(usuario, data=request.data, partial=True)
         if serializer.is_valid():
-            empleado = serializer.save()
-            EmpleadoAudit.objects.create(empleado=empleado, modificado_por=request.user, comentario="Actualización")
-            return Response(UsuarioSerializer(empleado).data)
+            usuario = serializer.save()
+            return Response(UsuarioSerializer(usuario).data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

@@ -2,53 +2,24 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
 from django.shortcuts import get_object_or_404
-from .models import Empresa
-from .serializers import EmpresaSerializer
-from Usuarios.models import Usuario, ActivationToken
-#from Base.utils import enviar_correo_activacion
+from .models import Empresa, Area
+from .serializers import EmpresaSerializer, AreaSerializer
 
-class EmpresaList(APIView):
+class EmpresaListCreate(APIView):
     permission_classes = [permissions.IsAdminUser]
 
     def get(self, request):
-        empresas = Empresa.objects.filter(estado=True)
-        nombre = request.query_params.get("nombre")
-        nit = request.query_params.get("nit")
-        estado = request.query_params.get("estado")
-
-        if nombre:
-            empresas = empresas.filter(nombre__icontains=nombre)
-        if nit:
-            empresas = empresas.filter(nit__icontains=nit)
-        if estado:
-            empresas = empresas.filter(estado=estado.lower() in ["true","1","activo"])
-
+        empresas = Empresa.objects.all()
         serializer = EmpresaSerializer(empresas, many=True)
         return Response(serializer.data)
-
-class EmpresaCreate(APIView):
-    permission_classes = [permissions.IsAdminUser]
 
     def post(self, request):
         serializer = EmpresaSerializer(data=request.data)
         if serializer.is_valid():
             empresa = serializer.save()
-
-            usuario_inicial = Usuario.objects.create(
-                username=empresa.nit,
-                email=empresa.correo_contacto,
-                empresa=empresa,
-                rol="admin_empresa",
-                estado=False
-            )
-            usuario_inicial.set_unusable_password()
-            usuario_inicial.save()
-
-            token = ActivationToken.create_for_user(usuario_inicial)
-            #enviar_correo_activacion(empresa.correo_contacto, token.token)
-
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response(EmpresaSerializer(empresa).data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class EmpresaUpdate(APIView):
     permission_classes = [permissions.IsAdminUser]
@@ -59,4 +30,22 @@ class EmpresaUpdate(APIView):
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class AreaListCreate(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, empresa_id):
+        areas = Area.objects.filter(empresa_id=empresa_id)
+        serializer = AreaSerializer(areas, many=True)
+        return Response(serializer.data)
+
+    def post(self, request, empresa_id):
+        data = request.data.copy()
+        data["empresa"] = empresa_id
+        serializer = AreaSerializer(data=data)
+        if serializer.is_valid():
+            area = serializer.save()
+            return Response(AreaSerializer(area).data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

@@ -1,9 +1,8 @@
 from django.urls import path
-from .views import ActivateAccount, EmpleadosList, EmpleadoCreate, EmpleadoUpdate
+from .views import UsuarioList, UsuarioCreate, UsuarioUpdate
 
 urlpatterns = [
-    path("auth/activate/", ActivateAccount.as_view(), name="authActivate"),
-    path("empleados/", EmpleadosList.as_view(), name="empleadosList"),
-    path("empleados/create/", EmpleadoCreate.as_view(), name="empleadosCreate"),
-    path("empleados/update/<int:pk>/", EmpleadoUpdate.as_view(), name="empleadosUpdate"),
+    path("usuarios/", UsuarioList.as_view(), name="usuarios-list"),
+    path("usuarios/create/", UsuarioCreate.as_view(), name="usuarios-create"),
+    path("usuarios/update/<int:pk>/", UsuarioUpdate.as_view(), name="usuarios-update"),
 ]

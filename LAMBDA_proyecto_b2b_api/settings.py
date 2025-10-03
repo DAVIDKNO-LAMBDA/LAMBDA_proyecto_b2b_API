@@ -10,30 +10,35 @@ load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Seguridad
-SECRET_KEY =  "l+liky^=tva5t$!gp^cgcz-v4^#_i4mc%_n&2f*0c2v&e_qld@"
 DEBUG = True
 ALLOWED_HOSTS = []  #  En producción, pon aquí tu dominio o IP
 
 # Apps instaladas
-INSTALLED_APPS = [
+DJANGO_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+]
 
-    # Terceros
+THIRD_PARTY_APPS = [
     "rest_framework",
+    "rest_framework_simplejwt.token_blacklist",
+    "corsheaders",
+    ]
 
-    # Apps locales (en mayúscula según guía)
+LOCAL_APPS = [
     "Base",
     "Usuarios",
     "Empresas",
 ]
+INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
 # Middlewares
 MIDDLEWARE = [
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -67,12 +72,7 @@ TEMPLATES = [
 WSGI_APPLICATION = "LAMBDA_proyecto_b2b_api.wsgi.application"
 
 # Base de datos ( por ahora SQLite, luego cambiar a PostgreSQL )
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
-    }
-}
+
 
 # Modelo de usuario personalizado
 AUTH_USER_MODEL = "Usuarios.Usuario"
@@ -93,14 +93,21 @@ EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER)
 
+
+
 # Internacionalización
 LANGUAGE_CODE = "es-es"
 TIME_ZONE = "America/Bogota"
 USE_I18N = True
+USE_I10N = True
 USE_TZ = True
+
 
 # Archivos estáticos
 STATIC_URL = "static/"
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
@@ -111,3 +118,22 @@ SIMPLE_JWT = {
     "BLACKLIST_AFTER_ROTATION": True,
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
+
+# CORS AUTORIZATIONS
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGINS = [
+    'http://localhost:5173',
+]
+
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.getenv("NAME_DATABASE"),
+        'USER': os.getenv("USER_DATABASE"),
+        'PASSWORD': os.getenv("PASS_DATABASE"),
+        'HOST': os.getenv("HOST_DATABASE", "localhost"),
+        'PORT': os.getenv("PORT_DATABASE", "5432"),
+    }
+}
+
