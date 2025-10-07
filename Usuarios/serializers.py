@@ -1,5 +1,7 @@
 from rest_framework import serializers
-from .models import Usuario
+from Usuarios.models import Usuario, ActivacionUsuario
+from Empresas.models import Empresa, Area
+
 
 class UsuarioSerializer(serializers.ModelSerializer):
     empresa_nombre = serializers.CharField(source="empresa.nombre", read_only=True)
@@ -7,23 +9,22 @@ class UsuarioSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Usuario
-        exclude = ["password", "groups", "user_permissions"]
+        fields = [
+            "id", "nombres", "apellidos", "email", "celular", "cargo",
+            "empresa", "empresa_nombre", "area", "area_nombre",
+            "is_active", "estado", "creado"
+        ]
+        read_only_fields = ["empresa_nombre", "area_nombre", "estado", "creado"]
 
-class UsuarioCreateSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, min_length=8)
-    
+
+class CrearUsuarioSerializer(serializers.ModelSerializer):
     class Meta:
         model = Usuario
-        fields = ["nombres", "apellidos", "email", "celular", "cargo", "empresa", "area", "password"]
+        fields = ["nombres", "apellidos", "email", "cargo", "area"]
 
-    def create(self, validated_data):
-        password = validated_data.pop("password")
-        user = Usuario(**validated_data)
-        user.set_password(password)
-        user.save()
-        return user
 
-class UsuarioUpdateSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Usuario
-        fields = ["nombres", "apellidos", "celular", "cargo", "area", "is_active", "estado"]
+class ActivacionSerializer(serializers.Serializer):
+    nombres = serializers.CharField()
+    celular = serializers.CharField()
+    cargo = serializers.CharField()
+    password = serializers.CharField(write_only=True)

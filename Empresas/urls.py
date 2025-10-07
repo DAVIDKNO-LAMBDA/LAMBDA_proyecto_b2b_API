@@ -1,8 +1,13 @@
 from django.urls import path
-from .views import EmpresaListCreate, EmpresaUpdate, AreaListCreate
+from Empresas.views import EmpresaCreateView, EmpresaListView, EmpresaUpdateView, AreaCreateView, AreaUpdateView
 
 urlpatterns = [
-    path("empresas/", EmpresaListCreate.as_view(), name="empresas-list-create"),
-    path("empresas/<int:pk>/update/", EmpresaUpdate.as_view(), name="empresas-update"),
-    path("empresas/<int:empresa_id>/areas/", AreaListCreate.as_view(), name="areas-list-create"),
+    # EMPRESAS
+    path("empresas/", EmpresaListView.as_view(), name="listar_empresas"),
+    path("empresas/crear/", EmpresaCreateView.as_view(), name="crear_empresa"),
+    path("empresas/<int:pk>/", EmpresaUpdateView.as_view(), name="editar_empresa"),
+
+    # ÁREAS
+    path("areas/crear/", AreaCreateView.as_view(), name="crear_area"),
+    path("areas/<int:pk>/", AreaUpdateView.as_view(), name="editar_area"),
 ]

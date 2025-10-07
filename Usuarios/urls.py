@@ -1,8 +1,13 @@
 from django.urls import path
-from .views import UsuarioList, UsuarioCreate, UsuarioUpdate
+from Usuarios.views import (
+    ActivarCuentaView, CrearEmpleadoView, ListarUsuariosView,
+    UsuarioUpdateView, AsignarJefeAreaView
+)
 
 urlpatterns = [
-    path("usuarios/", UsuarioList.as_view(), name="usuarios-list"),
-    path("usuarios/create/", UsuarioCreate.as_view(), name="usuarios-create"),
-    path("usuarios/update/<int:pk>/", UsuarioUpdate.as_view(), name="usuarios-update"),
+    path("usuarios/activar/<uuid:token>/", ActivarCuentaView.as_view(), name="activar_cuenta"),
+    path("usuarios/crear/", CrearEmpleadoView.as_view(), name="crear_empleado"),
+    path("usuarios/", ListarUsuariosView.as_view(), name="listar_usuarios"),
+    path("usuarios/<int:pk>/", UsuarioUpdateView.as_view(), name="editar_usuario"),
+    path("usuarios/<int:usuario_id>/asignar-jefe/", AsignarJefeAreaView.as_view(), name="asignar_jefe_area"),
 ]

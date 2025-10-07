@@ -33,6 +33,7 @@ LOCAL_APPS = [
     "Base",
     "Usuarios",
     "Empresas",
+    "Solicitudes",
 ]
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
@@ -79,10 +80,14 @@ AUTH_USER_MODEL = "Usuarios.Usuario"
 
 # Configuración de REST Framework
 REST_FRAMEWORK = {
-    "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.IsAuthenticated"
-    ]
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ),
+    "DEFAULT_PERMISSION_CLASSES": (
+        "rest_framework.permissions.IsAuthenticated",
+    ),
 }
+
 
 # Configuración de correo (para activaciones y bienvenida)
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
@@ -136,4 +141,6 @@ DATABASES = {
         'PORT': os.getenv("PORT_DATABASE", "5432"),
     }
 }
+
+SECRET_KEY = os.getenv("SECRET_KEY" )
 
