@@ -1,30 +1,88 @@
-from django.conf import settings
-from django.core.mail import send_mail
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.db import transaction
+from django.contrib.auth import get_user_model
+from django.conf import settings
+
+from Empresas.models import Empresa, Area
 from Usuarios.models import Usuario, ActivacionUsuario
+from Base.correos import enviar_correo
+
+
+def _contexto_activacion(usuario: Usuario, token):
+    base = getattr(settings, "ACTIVATION_BASE_URL", "http://localhost:8000/api")
+    url = f"{base}/usuarios/activar/{token}/"
+    return {
+        "nombre": usuario.nombres or "Usuario",
+        "cargo": usuario.cargo or "Usuario",
+        "token": str(token),
+        "url_activacion": url,
+    }
+
+
+@receiver(post_save, sender=Empresa)
+def crear_admin_empresa_y_enviar_mail(sender, instance: Empresa, created, **kwargs):
+    """
+    Al crear una empresa EXTERNA:
+    - crea Admin Empresa inactivo (sin contraseña)
+    - crea token de activación
+    - envía correo de activación al correo de contacto
+    """
+    if not created or instance.es_lambda:
+        return
+
+    def _create_and_mail():
+        User = get_user_model()
+        email_admin = instance.correo_contacto
+        if not email_admin:
+            return
+        if User.objects.filter(email=email_admin).exists():
+            return  # idempotente
+
+        area_fin = Area.objects.filter(empresa=instance, nombre__iexact="Finanzas").first()
+        user = User.objects.create_user(
+            email=email_admin,
+            nombres=instance.nombre_contacto or "Admin",
+            apellidos="",
+            cargo="Administrador de Empresa",
+            empresa=instance,
+            area=area_fin,
+            password=None,  # sin contraseña
+        )
+        user.es_admin_empresa = True
+        user.is_active = False
+        user.set_unusable_password()  # jamás guardar pass en claro
+        user.save(update_fields=["es_admin_empresa", "is_active", "password"])
+
+        act = ActivacionUsuario.objects.create(usuario=user)
+
+        enviar_correo(
+            asunto="Activa tu cuenta de Administrador de Empresa",
+            plantilla="emails/activacion.html",
+            contexto=_contexto_activacion(user, act.token),
+            destinatarios=[user.email],
+        )
+
+    transaction.on_commit(_create_and_mail)
 
 
 @receiver(post_save, sender=Usuario)
-def enviar_correo_activacion(sender, instance, created, **kwargs):
-    if created and not instance.is_active:
-        activacion, _ = ActivacionUsuario.objects.get_or_create(usuario=instance)
-        enlace = f"http://127.0.0.1:8000/api/usuarios/activar/{activacion.token}/"
+def enviar_mail_activacion_empleado(sender, instance: Usuario, created, **kwargs):
+    """
+    Para empleados creados por el Admin Empresa:
+    - si nacen inactivos, generar/obtener token de activación
+    - enviar correo de activación al email del empleado
+    """
+    if not created or instance.is_active:
+        return
 
-        asunto = "Activa tu cuenta en Lambda B2B"
-        mensaje = (
-            f"Hola {instance.nombres},\n\n"
-            "Tu cuenta ha sido creada en el sistema Lambda B2B.\n"
-            "Por favor, activa tu cuenta usando el siguiente enlace (válido por 48 horas):\n\n"
-            f"{enlace}\n\n"
-            "Gracias,\nEquipo Lambda B2B"
+    def _mail():
+        act, _ = ActivacionUsuario.objects.get_or_create(usuario=instance)
+        enviar_correo(
+            asunto="Activa tu cuenta",
+            plantilla="emails/activacion.html",
+            contexto=_contexto_activacion(instance, act.token),
+            destinatarios=[instance.email],
         )
 
-        send_mail(
-            asunto,
-            mensaje,
-            settings.DEFAULT_FROM_EMAIL,
-            [instance.email],
-            fail_silently=False,
-        )
-        print(f"📨 Correo de activación enviado a {instance.email}")
+    transaction.on_commit(_mail)

@@ -1,30 +1,32 @@
-from rest_framework import serializers
-from Usuarios.models import Usuario, ActivacionUsuario
-from Empresas.models import Empresa, Area
+from Usuarios.models import Usuario
 
-
-class UsuarioSerializer(serializers.ModelSerializer):
-    empresa_nombre = serializers.CharField(source="empresa.nombre", read_only=True)
-    area_nombre = serializers.CharField(source="area.nombre", read_only=True)
-
+class CrearEmpleadoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Usuario
-        fields = [
-            "id", "nombres", "apellidos", "email", "celular", "cargo",
-            "empresa", "empresa_nombre", "area", "area_nombre",
-            "is_active", "estado", "creado"
-        ]
-        read_only_fields = ["empresa_nombre", "area_nombre", "estado", "creado"]
+        fields = ["email", "nombres", "apellidos", "cargo", "area",
+                "es_solicitante", "validador_abastecimiento", "validador_financiero"]
 
+    def create(self, validated_data):
+        request = self.context["request"]
+        empresa = request.user.empresa
 
-class CrearUsuarioSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Usuario
-        fields = ["nombres", "apellidos", "email", "cargo", "area"]
+        usuario = Usuario.objects.create_user(
+            email=validated_data["email"],
+            nombres=validated_data["nombres"],
+            apellidos=validated_data.get("apellidos", ""),
+            cargo=validated_data["cargo"],
+            empresa=empresa,
+            area=validated_data["area"],
+            password=None,  # SIN password: lo define al activar
+        )
+        usuario.is_active = False
+        usuario.set_unusable_password()
+        usuario.es_solicitante = validated_data.get("es_solicitante", True)
+        usuario.validador_abastecimiento = validated_data.get("validador_abastecimiento", False)
+        usuario.validador_financiero = validated_data.get("validador_financiero", False)
+        usuario.save(update_fields=[
+            "is_active", "password", "es_solicitante",
+            "validador_abastecimiento", "validador_financiero"
+        ])
+        return usuario
 
-
-class ActivacionSerializer(serializers.Serializer):
-    nombres = serializers.CharField()
-    celular = serializers.CharField()
-    cargo = serializers.CharField()
-    password = serializers.CharField(write_only=True)
