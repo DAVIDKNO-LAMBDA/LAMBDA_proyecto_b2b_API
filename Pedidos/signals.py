@@ -1,0 +1,1 @@
+#usare las signals para  comprobaciones de pago o rechazo de pedidos

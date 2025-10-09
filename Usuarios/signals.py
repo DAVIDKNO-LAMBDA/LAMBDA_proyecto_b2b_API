@@ -39,7 +39,16 @@ def crear_admin_empresa_y_enviar_mail(sender, instance: Empresa, created, **kwar
         if User.objects.filter(email=email_admin).exists():
             return  # idempotente
 
-        area_fin = Area.objects.filter(empresa=instance, nombre__iexact="Finanzas").first()
+        # Buscar área 'Financiera' (fallback: crearla si no existe)
+        area_fin = Area.objects.filter(empresa=instance, nombre__iexact="Financiera").first()
+        if area_fin is None:
+            area_fin = Area.objects.create(
+                empresa=instance,
+                nombre="Financiera",
+                descripcion="Área encargada de la validación y gestión de pagos.",
+                tipo="financiera",
+            )
+
         user = User.objects.create_user(
             email=email_admin,
             nombres=instance.nombre_contacto or "Admin",
@@ -58,7 +67,7 @@ def crear_admin_empresa_y_enviar_mail(sender, instance: Empresa, created, **kwar
 
         enviar_correo(
             asunto="Activa tu cuenta de Administrador de Empresa",
-            plantilla="emails/activacion.html",
+            plantilla="Usuarios/emails/activacion.html",  # ← plantilla por app
             contexto=_contexto_activacion(user, act.token),
             destinatarios=[user.email],
         )
@@ -80,7 +89,7 @@ def enviar_mail_activacion_empleado(sender, instance: Usuario, created, **kwargs
         act, _ = ActivacionUsuario.objects.get_or_create(usuario=instance)
         enviar_correo(
             asunto="Activa tu cuenta",
-            plantilla="emails/activacion.html",
+            plantilla="Usuarios/emails/activacion.html",  # ← plantilla por app
             contexto=_contexto_activacion(instance, act.token),
             destinatarios=[instance.email],
         )

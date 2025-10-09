@@ -3,145 +3,94 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.models import Permission
-from django.core.mail import send_mail
-from django.conf import settings
-from django.utils import timezone
-from datetime import timedelta
-import uuid
 
 from Usuarios.models import Usuario, ActivacionUsuario
-from Usuarios.serializers import UsuarioSerializer, CrearUsuarioSerializer, ActivacionSerializer
-from Usuarios.decorators import permiso_requerido
+from Usuarios.serializers import (
+    UsuarioSerializer,
+    CrearEmpleadoSerializer,
+    ActivarCuentaSerializer,
+)
+from Usuarios.permissions import IsAdminEmpresa
+from Usuarios.decorators import MethodPermissionsMixin, require_admin_empresa
 
 
 # =====================================================
-# 🔹 Activar cuenta de usuario o jefe de empresa
+# Activar cuenta (admin empresa o empleado)
 # =====================================================
-class ActivarCuentaView(APIView):
+class ActivarCuentaView(generics.GenericAPIView):
     """
-    Permite activar la cuenta de un usuario (jefe o empleado)
-    usando el token que se envía al correo electrónico.
+    Activa una cuenta a partir del token enviado por correo.
     """
-    permission_classes = [permissions.AllowAny]
+    serializer_class = ActivarCuentaSerializer
+    authentication_classes = []   # público (con token)
+    permission_classes = []       # público (con token)
 
     def post(self, request, token):
         activacion = get_object_or_404(ActivacionUsuario, token=token)
 
-        # Verificar si ya fue usada o expiró
-        if activacion.usado:
-            return Response({"detail": "Este enlace ya fue usado."}, status=status.HTTP_400_BAD_REQUEST)
-        if activacion.fecha_expiracion < timezone.now():
-            return Response({"detail": "El enlace de activación ha expirado."}, status=status.HTTP_400_BAD_REQUEST)
-
-        serializer = ActivacionSerializer(data=request.data)
-        if serializer.is_valid():
-            usuario = activacion.usuario
-            usuario.nombres = serializer.validated_data["nombres"]
-            usuario.celular = serializer.validated_data["celular"]
-            usuario.cargo = serializer.validated_data["cargo"]
-            usuario.set_password(serializer.validated_data["password"])
-            usuario.is_active = True
-            usuario.save()
-
-            # Marcar token como usado
-            activacion.usado = True
-            activacion.save()
-
-            return Response(
-                {"detail": "Cuenta activada correctamente. Ya puedes iniciar sesión."},
-                status=status.HTTP_200_OK
-            )
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        ser = self.get_serializer(
+            data=request.data,
+            context={"usuario": activacion.usuario, "activacion": activacion}
+        )
+        ser.is_valid(raise_exception=True)
+        ser.save()
+        return Response(
+            {"detail": "Cuenta activada correctamente. Ya puedes iniciar sesión."},
+            status=status.HTTP_200_OK
+        )
 
 
 # =====================================================
-# 🔹 Crear Empleados (solo AdminEmpresa)
+# 🔹 Crear Empleados (Admin Empresa o Jefe de Área)
 # =====================================================
 class CrearEmpleadoView(generics.CreateAPIView):
     """
-    Permite al admin de empresa crear empleados.
-    - Genera un token de activación por correo.
+    Permite crear empleados:
+      - Admin Empresa: en cualquier área de su empresa (puede marcar es_admin_empresa).
+      - Jefe de Área: solo en su área (no puede marcar es_admin_empresa).
+    Las señales envían el correo de activación automáticamente.
     """
-    serializer_class = CrearUsuarioSerializer
+    serializer_class = CrearEmpleadoSerializer
     permission_classes = [permissions.IsAuthenticated]
-
-    @permiso_requerido("Usuarios.es_admin_empresa")
-    def post(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        empleado = serializer.save(
-            empresa=request.user.empresa,
-            is_active=False
-        )
-
-        # Crear token de activación
-        token = uuid.uuid4()
-        ActivacionUsuario.objects.create(
-            usuario=empleado,
-            token=token,
-            fecha_expiracion=timezone.now() + timedelta(days=2)
-        )
-
-        # Enviar correo al empleado con el enlace
-        activation_link = f"http://127.0.0.1:8000/api/usuarios/activar/{token}/"
-        subject = f"Activación de cuenta en {request.user.empresa.nombre}"
-        message = (
-            f"¡Hola {empleado.nombres or 'nuevo empleado'}!\n\n"
-            f"Has sido registrado en la empresa '{request.user.empresa.nombre}'.\n\n"
-            f"Activa tu cuenta haciendo clic en el siguiente enlace (válido por 2 días):\n"
-            f"{activation_link}\n\n"
-            f"Tu usuario es: {empleado.email}\n\n"
-            f"Atentamente,\nEquipo de {request.user.empresa.nombre}"
-        )
-
-        try:
-            send_mail(
-                subject,
-                message,
-                settings.EMAIL_HOST_USER,
-                [empleado.email],
-                fail_silently=False,
-            )
-            print(f"📧 Correo de activación enviado a {empleado.email}")
-        except Exception as e:
-            print(f"⚠️ Error al enviar correo a {empleado.email}: {e}")
-
-        return Response(
-            {"detail": f"Empleado {empleado.email} creado correctamente. Se envió correo de activación."},
-            status=status.HTTP_201_CREATED
-        )
+    # La validación fina (admin vs jefe) se hace en el serializer.
 
 
 # =====================================================
-# 🔹 Listar Usuarios (por empresa)
+# 🔹 Listar Usuarios (por empresa, paginado)
 # =====================================================
 class ListarUsuariosView(generics.ListAPIView):
     """
-    Lista todos los empleados activos de la empresa actual.
+    Lista usuarios de la empresa del usuario autenticado.
+    Filtros opcionales:
+      - ?activos=true/false  (por defecto true)
     """
     serializer_class = UsuarioSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         empresa = self.request.user.empresa
-        return Usuario.objects.filter(empresa=empresa, estado=True)
+        activos = self.request.query_params.get("activos", "true").lower()
+        qs = Usuario.objects.filter(empresa=empresa)
+        if activos in ("true", "1", "yes", "t"):
+            qs = qs.filter(is_active=True)
+        return qs.order_by("nombres", "apellidos")
 
 
 # =====================================================
-# 🔹 Editar Usuarios (solo AdminEmpresa)
+# 🔹 Editar Usuario (solo Admin Empresa, dentro de su empresa)
 # =====================================================
 class UsuarioUpdateView(generics.UpdateAPIView):
     """
-    Permite al admin editar la información básica de un usuario.
+    Permite al Admin Empresa editar datos básicos de un usuario de SU empresa.
+    No permite cambiar email ni empresa por API.
     """
     serializer_class = UsuarioSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, IsAdminEmpresa]
     lookup_field = "pk"
 
     def get_queryset(self):
         return Usuario.objects.filter(empresa=self.request.user.empresa)
 
-    @permiso_requerido("Usuarios.es_admin_empresa")
     def update(self, request, *args, **kwargs):
         usuario = self.get_object()
         data = request.data.copy()
@@ -158,19 +107,56 @@ class UsuarioUpdateView(generics.UpdateAPIView):
 
 
 # =====================================================
-# 🔹 Asignar / Remover Permisos (Jefe de área)
+# 🔹 Promover / remover Admin de Empresa
 # =====================================================
-class AsignarJefeAreaView(APIView):
+class ToggleAdminEmpresaView(MethodPermissionsMixin, generics.GenericAPIView):
     """
-    Permite asignar o remover permisos especiales a usuarios dentro de una empresa.
+    Admin Empresa puede promover o remover a otro usuario como Admin Empresa
+    dentro de su misma empresa.
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, IsAdminEmpresa]
 
-    @permiso_requerido("Usuarios.es_admin_empresa")
+    @require_admin_empresa  # decorador compatible: DRF seguirá usando permission_classes
+    def post(self, request, usuario_id):
+        admin = request.user
+        usuario = get_object_or_404(Usuario, pk=usuario_id, empresa=admin.empresa)
+        nuevo_estado = bool(request.data.get("es_admin_empresa"))
+        usuario.es_admin_empresa = nuevo_estado
+        usuario.save(update_fields=["es_admin_empresa"])
+        accion = "promovido" if nuevo_estado else "removido"
+        return Response(
+            {"detail": f"Usuario {accion} como admin de empresa."},
+            status=status.HTTP_200_OK
+        )
+
+
+# =====================================================
+# 🔹 Asignar / remover permisos por codename (opcional)
+#    Útil si quieres usar codenames nativos:
+#    - valida_financiero
+#    - valida_abastecimiento
+#    - valida_logistica
+#    - valida_venta
+# =====================================================
+class AsignarPermisoUsuarioView(MethodPermissionsMixin, APIView):
+    """
+    Admin Empresa asigna/remueve permisos nativos (codenames) a usuarios de su empresa.
+    Body:
+      {
+        "permiso": "valida_financiero",
+        "asignar": true
+      }
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAdminEmpresa]
+
+    @require_admin_empresa
     def post(self, request, usuario_id):
         usuario = get_object_or_404(Usuario, id=usuario_id, empresa=request.user.empresa)
         permiso_codename = request.data.get("permiso")
-        asignar = request.data.get("asignar", True)
+        asignar = bool(request.data.get("asignar", True))
+
+        if not permiso_codename:
+            return Response({"detail": "Debes enviar 'permiso'."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             permiso = Permission.objects.get(codename=permiso_codename)
