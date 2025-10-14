@@ -1,45 +1,64 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from Empresas.models import Empresa, Area
-from Usuarios.models import Usuario
+from Usuarios.models import ActivacionUsuario
+from Base.correos import enviar_correo
+from django.conf import settings
 
 @receiver(post_save, sender=Empresa)
-def crear_estructura_empresa(sender, instance, created, **kwargs):
+def configurar_areas_y_admin_inicial(sender, instance: Empresa, created, **kwargs):
     if not created:
         return
 
+    # Áreas base
     if instance.es_lambda:
-        areas_lambda = [
-            ("Coordinación", "Supervisa procesos del sistema", "coordinacion"),
-            ("Dirección", "Aprueba compras grandes o de alto valor", "direccion"),
-            ("Abastecimiento", "Gestiona inventario y productos", "abastecimiento"),
-            ("Financiera", "Valida pagos y genera facturas", "financiera"),
-        ]
-        for nombre, desc, tipo in areas_lambda:
-            Area.objects.get_or_create(
-                nombre=nombre,
-                empresa=instance,
-                defaults={"descripcion": desc, "tipo": tipo}
-            )
-        print("✅ Estructura interna de Lambda creada correctamente.")
+        base = [("Coordinación","coordinacion"), ("Financiera","financiera"), ("Abastecimiento","abastecimiento")]
     else:
-        area_financiera, _ = Area.objects.get_or_create(
-            nombre="Financiera",
-            empresa=instance,
-            defaults={"descripcion": "Área encargada de la validación y gestión de pagos.", "tipo": "financiera"}
+        base = [("Financiera","financiera"), ("Abastecimiento","abastecimiento")]
+    for nombre, tipo in base:
+        Area.objects.get_or_create(
+            empresa=instance, nombre=nombre,
+            defaults={"descripcion": f"Área {nombre}", "tipo": tipo},
         )
 
-        admin_email = f"admin@{instance.nombre.lower().replace(' ', '')}.com"
-        if not Usuario.objects.filter(email=admin_email).exists():
-            admin_empresa = Usuario.objects.create_user(
-                email=admin_email,
-                nombres="Admin",
-                apellidos=instance.nombre,
+    # Crear admin inicial para empresa externa y enviar activación
+    if not instance.es_lambda and instance.correo_contacto:
+        User = get_user_model()
+        if not User.objects.filter(email=instance.correo_contacto).exists():
+            area_fin = Area.objects.filter(empresa=instance, nombre__iexact="Financiera").first()
+            admin = User.objects.create_user(
+                email=instance.correo_contacto,
+                nombres=instance.nombre_contacto or "Admin",
+                apellidos="",
                 cargo="Administrador de Empresa",
                 empresa=instance,
-                area=area_financiera,
-                password="Temporal123*",
-                is_active=False
+                area=area_fin,
+                password=None,
             )
-            admin_empresa.user_permissions.add("Usuarios.es_admin_empresa")
-            print(f"✅ Creado admin empresa {admin_email}")
+            admin.is_active = False
+            admin.set_unusable_password()
+            admin.save(update_fields=["is_active", "password"])
+
+            # Asignar grupo "Admin Empresa"
+            try:
+                grp = Group.objects.get(name="Admin Empresa")
+                admin.groups.add(grp)
+            except Group.DoesNotExist:
+                pass
+
+            act = ActivacionUsuario.objects.create(usuario=admin)
+
+            base_url = getattr(settings, "ACTIVATION_BASE_URL", "http://localhost:8000/api")
+            enviar_correo(
+                asunto="Activa tu cuenta de Administrador de Empresa",
+                plantilla="Usuarios/emails/activacion.html",
+                contexto={
+                    "nombre": admin.nombres or "Usuario",
+                    "cargo": admin.cargo or "Usuario",
+                    "token": str(act.token),
+                    "url_activacion": f"{base_url}/usuarios/activar/{act.token}/",
+                },
+                destinatarios=[admin.email],
+            )

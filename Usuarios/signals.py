@@ -1,30 +1,31 @@
-from django.conf import settings
-from django.core.mail import send_mail
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.db import transaction
+from django.contrib.auth import get_user_model
+from Empresas.models import Empresa, Area
 from Usuarios.models import Usuario, ActivacionUsuario
+from Base.correos import enviar_correo
+from django.conf import settings
 
+def _ctx(usuario: Usuario, token):
+    base = getattr(settings, "ACTIVATION_BASE_URL", "http://localhost:8000/api")
+    return {
+        "nombre": usuario.nombres or "Usuario",
+        "cargo": usuario.cargo or "Usuario",
+        "token": str(token),
+        "url_activacion": f"{base}/usuarios/activar/{token}/",
+    }
 
 @receiver(post_save, sender=Usuario)
-def enviar_correo_activacion(sender, instance, created, **kwargs):
-    if created and not instance.is_active:
-        activacion, _ = ActivacionUsuario.objects.get_or_create(usuario=instance)
-        enlace = f"http://127.0.0.1:8000/api/usuarios/activar/{activacion.token}/"
-
-        asunto = "Activa tu cuenta en Lambda B2B"
-        mensaje = (
-            f"Hola {instance.nombres},\n\n"
-            "Tu cuenta ha sido creada en el sistema Lambda B2B.\n"
-            "Por favor, activa tu cuenta usando el siguiente enlace (válido por 48 horas):\n\n"
-            f"{enlace}\n\n"
-            "Gracias,\nEquipo Lambda B2B"
+def enviar_mail_activacion_empleado(sender, instance: Usuario, created, **kwargs):
+    if not created or instance.is_active:
+        return
+    def _mail():
+        act, _ = ActivacionUsuario.objects.get_or_create(usuario=instance)
+        enviar_correo(
+            asunto="Activa tu cuenta",
+            plantilla="Usuarios/emails/activacion.html",
+            contexto=_ctx(instance, act.token),
+            destinatarios=[instance.email],
         )
-
-        send_mail(
-            asunto,
-            mensaje,
-            settings.DEFAULT_FROM_EMAIL,
-            [instance.email],
-            fail_silently=False,
-        )
-        print(f"📨 Correo de activación enviado a {instance.email}")
+    transaction.on_commit(_mail)

@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+    <title>Activa tu cuenta</title>
+</head>
+<body style="font-family: Arial, sans-serif;">
+    <h2>¡Hola {{ nombre }}!</h2>
+    <p>Has sido registrado en la plataforma. Para activar tu cuenta haz clic en el siguiente enlace:</p>
+    <p>
+    <a href="{{ url_activacion }}" target="_blank" style="background:#2563eb;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none;">
+    Activar cuenta
+    </a>
+    </p>
+    <p>Si el botón no funciona, copia y pega esta URL en tu navegador:</p>
+    <p>{{ url_activacion }}</p>
+    <hr/>
+    <small>Si no esperabas este correo, puedes ignorarlo.</small>
+</body>
+</html>
