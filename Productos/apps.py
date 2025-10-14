@@ -5,4 +5,4 @@ class ProductosConfig(AppConfig):
     name = "Productos"
 
     def ready(self):
-        from . import signals  # noqa
+        from . import signals

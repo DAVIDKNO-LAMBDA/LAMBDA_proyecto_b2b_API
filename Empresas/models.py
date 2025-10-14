@@ -1,9 +1,7 @@
 from django.db import models
 from django.conf import settings
 from django.core.exceptions import ValidationError
-
 from Base.models import BaseModel
-
 
 class Empresa(BaseModel):
     nombre = models.CharField(max_length=255, verbose_name="Nombre de la empresa")
@@ -38,7 +36,6 @@ class Area(BaseModel):
     tipo = models.CharField(max_length=50, choices=TIPOS, default="operativa", verbose_name="Tipo de área")
     empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name="areas", verbose_name="Empresa")
 
-    # 🔹 NUEVO: jefe de área (puede ser nulo)
     jefe = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -63,7 +60,6 @@ class Area(BaseModel):
 
     def clean(self):
         super().clean()
-        # Si hay jefe asignado, debe pertenecer a la misma empresa del área
         if self.jefe and getattr(self.jefe, "empresa_id", None) != self.empresa_id:
             raise ValidationError({"jefe": "El jefe de área debe pertenecer a la misma empresa."})
 

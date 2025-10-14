@@ -5,5 +5,4 @@ class UsuariosConfig(AppConfig):
     name = "Usuarios"
 
     def ready(self):
-        # Carga señales de Usuarios (activación por correo, etc.)
-        from . import signals  # noqa: F401
+        from . import signals  # registra señales

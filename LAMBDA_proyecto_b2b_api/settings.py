@@ -27,15 +27,14 @@ THIRD_PARTY_APPS = [
     "rest_framework",
     "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
+    "django_filters",
     ]
 
 LOCAL_APPS = [
     "Base",
-    "Usuarios",
-    "Empresas",
-    "Solicitudes",
-    "Productos",
-    "Pedidos",
+    "Empresas.apps.EmpresasConfig",
+    "Usuarios.apps.UsuariosConfig",
+    "Productos.apps.ProductosConfig",
 ]
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
@@ -74,22 +73,29 @@ TEMPLATES = [
 # WSGI
 WSGI_APPLICATION = "LAMBDA_proyecto_b2b_api.wsgi.application"
 
-# Base de datos ( por ahora SQLite, luego cambiar a PostgreSQL )
+
 
 
 # Modelo de usuario personalizado
 AUTH_USER_MODEL = "Usuarios.Usuario"
 
-# Configuración de REST Framework
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
+    # ⬇️ Política por defecto: autenticado + permisos por codename del modelo
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",
+        "rest_framework.permissions.DjangoModelPermissions",
+    ),
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 20,
+    "DEFAULT_FILTER_BACKENDS": (
+        "django_filters.rest_framework.DjangoFilterBackend",
+        "rest_framework.filters.SearchFilter",
+        "rest_framework.filters.OrderingFilter",
     ),
 }
-
 
 # Configuración de correo (para activaciones y bienvenida)
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"

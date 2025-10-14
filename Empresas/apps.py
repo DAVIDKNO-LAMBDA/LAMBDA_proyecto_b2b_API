@@ -5,4 +5,4 @@ class EmpresasConfig(AppConfig):
     name = "Empresas"
 
     def ready(self):
-        from . import signals  # noqa: F401
+        from . import signals  # registra los receivers
