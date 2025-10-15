@@ -1,64 +1,52 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from Empresas.models import Empresa, Area
-from Usuarios.models import ActivacionUsuario
-from Base.correos import enviar_correo
-from django.conf import settings
+from Usuarios.models import Usuario, ActivacionUsuario
 
 @receiver(post_save, sender=Empresa)
-def configurar_areas_y_admin_inicial(sender, instance: Empresa, created, **kwargs):
-    if not created:
-        return
-
-    # Áreas base
-    if instance.es_lambda:
-        base = [("Coordinación","coordinacion"), ("Financiera","financiera"), ("Abastecimiento","abastecimiento")]
-    else:
-        base = [("Financiera","financiera"), ("Abastecimiento","abastecimiento")]
-    for nombre, tipo in base:
+def configurar_areas_y_admin_inicial(sender, instance, created, **kwargs):
+    if created:
+        # --- PASO 1: Crear áreas por defecto ---
+        # Esto es útil para todas las empresas, incluida Lambda.
+        area_gerencia, _ = Area.objects.get_or_create(
+            empresa=instance,
+            nombre="Gerencia",
+            defaults={"descripcion": "Área de Gerencia General"}
+        )
         Area.objects.get_or_create(
-            empresa=instance, nombre=nombre,
-            defaults={"descripcion": f"Área {nombre}", "tipo": tipo},
+            empresa=instance,
+            nombre="Abastecimiento",
+            defaults={"descripcion": "Área de compras y abastecimiento"}
+        )
+        Area.objects.get_or_create(
+            empresa=instance,
+            nombre="Finanzas",
+            defaults={"descripcion": "Área de contabilidad y finanzas"}
         )
 
-    # Crear admin inicial para empresa externa y enviar activación
-    if not instance.es_lambda and instance.correo_contacto:
-        User = get_user_model()
-        if not User.objects.filter(email=instance.correo_contacto).exists():
-            area_fin = Area.objects.filter(empresa=instance, nombre__iexact="Financiera").first()
-            admin = User.objects.create_user(
+        # --- PASO 2: Crear usuario admin inicial SÓLO para empresas CLIENTE ---
+        # Verificamos que la empresa que se está creando NO sea la principal.
+        if instance.nombre != "Lambda Commerce Solutions":
+            # Si no es Lambda, entonces sí creamos el admin y su token.
+            admin = Usuario.objects.create_user(
                 email=instance.correo_contacto,
-                nombres=instance.nombre_contacto or "Admin",
-                apellidos="",
-                cargo="Administrador de Empresa",
+                nombres=instance.nombre,
+                apellidos="(Admin)",      # Placeholder para el apellido
+                cargo="Administrador",    # Cargo por defecto
                 empresa=instance,
-                area=area_fin,
-                password=None,
+                area=area_gerencia,       # Asignamos al área de Gerencia
+                password=None,            # Sin contraseña inicial
             )
-            admin.is_active = False
-            admin.set_unusable_password()
-            admin.save(update_fields=["is_active", "password"])
-
-            # Asignar grupo "Admin Empresa"
+            
+            # Asignar rol de admin de empresa
             try:
-                grp = Group.objects.get(name="Admin Empresa")
-                admin.groups.add(grp)
+                rol_admin_empresa = Group.objects.get(name="admin_empresa")
+                admin.groups.add(rol_admin_empresa)
             except Group.DoesNotExist:
-                pass
+                # Manejar el caso en que el grupo aún no exista
+                print("ADVERTENCIA: El grupo 'admin_empresa' no existe. No se pudo asignar el rol.")
 
-            act = ActivacionUsuario.objects.create(usuario=admin)
-
-            base_url = getattr(settings, "ACTIVATION_BASE_URL", "http://localhost:8000/api")
-            enviar_correo(
-                asunto="Activa tu cuenta de Administrador de Empresa",
-                plantilla="Usuarios/emails/activacion.html",
-                contexto={
-                    "nombre": admin.nombres or "Usuario",
-                    "cargo": admin.cargo or "Usuario",
-                    "token": str(act.token),
-                    "url_activacion": f"{base_url}/usuarios/activar/{act.token}/",
-                },
-                destinatarios=[admin.email],
-            )
+            # Crear token de activación para que el admin establezca su contraseña
+            ActivacionUsuario.objects.create(usuario=admin)
+            print(f"Usuario admin y token de activación creados para la empresa cliente: {instance.nombre}")

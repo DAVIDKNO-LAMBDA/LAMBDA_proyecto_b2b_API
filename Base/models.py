@@ -24,12 +24,13 @@ def guardar_archivo(instance, filename):
     return normalized_path
 
 class BaseModel(models.Model):
-    creado = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de creación")
-    modificado = models.DateTimeField(auto_now=True, verbose_name="Fecha de modificación")
+    fecha_creacion = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de creación")
+    fecha_modificacion = models.DateTimeField(auto_now=True, verbose_name="Fecha de modificación")
     estado = models.BooleanField(default=True, verbose_name="Estado")
 
     class Meta:
         abstract = True
+        ordering = ['-fecha_creacion']
         
     @property
     def get_estado(self):

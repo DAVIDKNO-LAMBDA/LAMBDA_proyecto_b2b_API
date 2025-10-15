@@ -11,6 +11,22 @@ class UsuarioManager(BaseUserManager):
     def create_user(self, email, nombres, apellidos, cargo, empresa, area, password=None, **extra_fields):
         if not email:
             raise ValueError("El usuario debe tener un correo electrónico")
+
+        # --- INICIO DE LA CORRECCIÓN ---
+        # Si 'empresa' o 'area' son un ID (int o str), obtenemos el objeto.
+        if not isinstance(empresa, Empresa):
+            try:
+                empresa = Empresa.objects.get(id=empresa)
+            except Empresa.DoesNotExist:
+                raise ValueError("La empresa especificada no existe.")
+        
+        if not isinstance(area, Area):
+            try:
+                area = Area.objects.get(id=area)
+            except Area.DoesNotExist:
+                raise ValueError("El área especificada no existe.")
+        # --- FIN DE LA CORRECCIÓN ---
+            
         email = self.normalize_email(email)
         user = self.model(
             email=email, nombres=nombres, apellidos=apellidos, cargo=cargo,
@@ -28,7 +44,14 @@ class UsuarioManager(BaseUserManager):
         extra_fields.setdefault("is_staff", True)
         extra_fields.setdefault("is_superuser", True)
         extra_fields.setdefault("is_active", True)
+
+        if extra_fields.get("is_staff") is not True:
+            raise ValueError("Superuser must have is_staff=True.")
+        if extra_fields.get("is_superuser") is not True:
+            raise ValueError("Superuser must have is_superuser=True.")
+
         return self.create_user(email, nombres, apellidos, cargo, empresa, area, password, **extra_fields)
+
 
 class Usuario(BaseModel, AbstractBaseUser, PermissionsMixin):
     nombres = models.CharField(max_length=255, verbose_name="Nombres")
