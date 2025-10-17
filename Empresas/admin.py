@@ -6,17 +6,18 @@ class EmpresaAdmin(admin.ModelAdmin):
     """
     Configuración del admin para el modelo Empresa.
     """
-    list_display = ('nombre', 'nit', 'sector', 'estado', 'pagar_despues')
-    search_fields = ('nombre', 'nit')
-    list_filter = ('estado', 'sector', 'pagar_despues')
-    ordering = ('nombre',)
+    list_display = ['id', 'nombre', 'nit', 'sector', 'pagar_despues', 'created_at']
+    search_fields = ['nombre', 'nit']
+    list_filter = ['pagar_despues', 'es_lambda', 'created_at']
+    ordering = ['-created_at']
 
 @admin.register(Area)
 class AreaAdmin(admin.ModelAdmin):
     """
     Configuración del admin para el modelo Area.
     """
-    list_display = ('nombre', 'empresa', 'estado')
-    search_fields = ('nombre',)
-    list_filter = ('estado', 'empresa')
-    ordering = ('empresa', 'nombre')
+    list_display = ['id', 'nombre', 'empresa', 'created_at']
+    list_filter = ['empresa', 'created_at']
+    
+    search_fields = ['nombre', 'empresa__nombre']
+    ordering = ['-created_at']

@@ -1,50 +1,56 @@
-from rest_framework import generics, permissions, status
-from rest_framework.response import Response
-from Empresas.models import Empresa, Area
-from Empresas.serializers import EmpresaSerializer, AreaSerializer
+from rest_framework import generics, permissions
+from .models import Empresa, Area
+from .serializers import EmpresaSerializer, AreaSerializer
 
-class EmpresaListView(generics.ListAPIView):
-    queryset = Empresa.objects.filter(estado=True)
+# --- Vistas para el modelo Empresa ---
+
+class EmpresaListCreateAPIView(generics.ListCreateAPIView):
+    """
+    Vista para listar (GET) y crear (POST) Empresas.
+    """
+    queryset = Empresa.objects.filter(deleted_at__isnull=True)
     serializer_class = EmpresaSerializer
     permission_classes = [permissions.IsAuthenticated, permissions.DjangoModelPermissions]
 
-class EmpresaCreateView(generics.CreateAPIView):
+class EmpresaRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    Vista para ver detalle (GET), actualizar (PUT/PATCH) y eliminar (DELETE) una Empresa.
+    """
     queryset = Empresa.objects.all()
     serializer_class = EmpresaSerializer
     permission_classes = [permissions.IsAuthenticated, permissions.DjangoModelPermissions]
-    def perform_create(self, serializer):
-        serializer.save(es_lambda=False)
 
-class EmpresaUpdateView(generics.UpdateAPIView):
-    queryset = Empresa.objects.all()
-    serializer_class = EmpresaSerializer
-    permission_classes = [permissions.IsAuthenticated, permissions.DjangoModelPermissions]
-    lookup_field = "pk"
-    def update(self, request, *args, **kwargs):
-        empresa = self.get_object()
-        ser = self.get_serializer(empresa, data=request.data, partial=True)
-        ser.is_valid(raise_exception=True)
-        ser.save()
-        return Response({"detail": f"Empresa '{empresa.nombre}' actualizada correctamente."}, status=status.HTTP_200_OK)
 
-class AreaCreateView(generics.CreateAPIView):
-    queryset = Area.objects.all()
+# --- Vistas para el modelo Area ---
+
+class AreaListCreateAPIView(generics.ListCreateAPIView):
+    """
+    Vista para listar (GET) y crear (POST) Áreas.
+    """
     serializer_class = AreaSerializer
     permission_classes = [permissions.IsAuthenticated, permissions.DjangoModelPermissions]
-    def perform_create(self, serializer):
-        serializer.save(empresa=self.request.user.empresa)
 
-class AreaUpdateView(generics.UpdateAPIView):
-    serializer_class = AreaSerializer
-    permission_classes = [permissions.IsAuthenticated, permissions.DjangoModelPermissions]
-    lookup_field = "pk"
     def get_queryset(self):
-        return Area.objects.filter(empresa=self.request.user.empresa)
-    def update(self, request, *args, **kwargs):
-        area = self.get_object()
-        data = request.data.copy()
-        data.pop("empresa", None)
-        ser = self.get_serializer(area, data=data, partial=True)
-        ser.is_valid(raise_exception=True)
-        ser.save()
-        return Response({"detail": f"Área '{area.nombre}' actualizada correctamente."}, status=status.HTTP_200_OK)
+        """
+        Filtra las áreas para que un usuario no-superuser solo vea las de su empresa.
+        """
+        usuario = self.request.user
+        if not usuario.is_superuser and hasattr(usuario, 'empresa'):
+            return Area.objects.filter(empresa=usuario.empresa)
+        return Area.objects.all()
+
+class AreaRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    Vista para ver detalle (GET), actualizar (PUT/PATCH) y eliminar (DELETE) un Área.
+    """
+    serializer_class = AreaSerializer
+    permission_classes = [permissions.IsAuthenticated, permissions.DjangoModelPermissions]
+
+    def get_queryset(self):
+        """
+        Filtra las áreas para que un usuario no-superuser solo vea las de su empresa.
+        """
+        usuario = self.request.user
+        if not usuario.is_superuser and hasattr(usuario, 'empresa'):
+            return Area.objects.filter(empresa=usuario.empresa)
+        return Area.objects.all()

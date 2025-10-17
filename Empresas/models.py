@@ -4,22 +4,24 @@ from django.core.exceptions import ValidationError
 from Base.models import BaseModel
 
 class Empresa(BaseModel):
-    nombre = models.CharField(max_length=255, verbose_name="Nombre de la empresa")
-    sector = models.CharField(max_length=255, verbose_name="Sector económico")
-    nit = models.CharField(max_length=15, unique=True, verbose_name="NIT")
-    nombre_contacto = models.CharField(max_length=255, verbose_name="Nombre del contacto")
-    correo_contacto = models.EmailField(verbose_name="Correo del contacto")
-    pagar_despues = models.BooleanField(default=False, verbose_name="Habilidad para pagar después")
-    es_lambda = models.BooleanField(default=False, verbose_name="¿Es la empresa Lambda?")
-
+    nombre = models.CharField(max_length=255, unique=True, verbose_name="Nombre de la empresa")
+    sector = models.CharField(max_length=255, verbose_name="Sector")
+    nit = models.CharField(max_length=20, unique=True, verbose_name="NIT")
+    correo_contacto = models.EmailField(verbose_name="Correo de contacto")
+    nombre_contacto = models.CharField(max_length=255, verbose_name="Nombre del contacto", null=True, blank=True)
+    pagar_despues = models.BooleanField(default=False, verbose_name="¿Puede pagar después?")
+    es_lambda = models.BooleanField(default=False, verbose_name="¿Es empresa Lambda?")
+    
+    estado = models.BooleanField(default=True, verbose_name="Estado activo")
+    
     class Meta:
         verbose_name = "Empresa"
         verbose_name_plural = "Empresas"
         db_table = "empresas"
-        ordering = ["nombre"]
-
+        ordering = ['-created_at']
+    
     def __str__(self):
-        return f"{self.nombre} ({self.nit})"
+        return self.nombre
 
 
 class Area(BaseModel):
