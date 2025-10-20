@@ -1,0 +1,1432 @@
+{
+  "info": {
+    "name": "Lambda B2B API - Testing Completo",
+    "description": "Colección completa para testing del sistema Lambda B2B con flujo de aprobaciones de 4 pasos",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000",
+      "type": "string"
+    },
+    {
+      "key": "admin_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "empresa_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "jefe_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "empleado_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "abasto_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "finanzas_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "empresa_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "area_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "producto_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "solicitud_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "pedido_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "🔑 1. AUTENTICACIÓN Y SETUP",
+      "item": [
+        {
+          "name": "1.1 Login Admin Lambda",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has access token', () => {",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response).to.have.property('access');",
+                  "    pm.collectionVariables.set('admin_token', response.access);",
+                  "});",
+                  "",
+                  "pm.test('User is Admin Lambda', () => {",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.user.email).to.equal('admin@lambdacommerce.com');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@lambdacommerce.com\",\n  \"password\": \"Lambda123!\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/usuarios/login/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "usuarios", "login", ""]
+            }
+          }
+        },
+        {
+          "name": "1.2 Crear Empresa TechCorp",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', () => {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Empresa creada correctamente', () => {",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.nombre).to.equal('TechCorp Solutions');",
+                  "    pm.collectionVariables.set('empresa_id', response.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"TechCorp Solutions\",\n  \"sector\": \"TECNOLOGIA\",\n  \"nit\": \"900123456-1\",\n  \"correo_contacto\": \"admin@techcorp.com\",\n  \"pagar_despues\": false\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/empresas/empresas/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "empresas", "empresas", ""]
+            }
+          }
+        },
+        {
+          "name": "1.3 Crear Área Desarrollo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', () => {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Área creada correctamente', () => {",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.nombre).to.equal('Desarrollo');",
+                  "    pm.collectionVariables.set('area_id', response.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Desarrollo\",\n  \"empresa\": {{empresa_id}},\n  \"presupuesto_maximo\": 100000.00\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/empresas/areas/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "empresas", "areas", ""]
+            }
+          }
+        },
+        {
+          "name": "1.4 Crear Producto Laptop",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', () => {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Producto creado correctamente', () => {",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.nombre).to.equal('Laptop Dell Inspiron 15');",
+                  "    pm.collectionVariables.set('producto_id', response.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Laptop Dell Inspiron 15\",\n  \"descripcion\": \"Laptop para desarrollo\",\n  \"categoria\": \"HARDWARE\",\n  \"precio\": 2500000.00,\n  \"stock_disponible\": 50,\n  \"stock_minimo\": 5\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/productos/productos/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "productos", "productos", ""]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "👥 2. CREACIÓN DE USUARIOS",
+      "item": [
+        {
+          "name": "2.1 Crear Admin Empresa",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', () => {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Admin empresa creado', () => {",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.email).to.equal('admin@techcorp.com');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@techcorp.com\",\n  \"password\": \"admin123\",\n  \"nombres\": \"Carlos\",\n  \"apellidos\": \"Rodriguez\",\n  \"cargo\": \"Administrador\",\n  \"empresa\": {{empresa_id}},\n  \"area\": {{area_id}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/usuarios/usuarios/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "usuarios", "usuarios", ""]
+            }
+          }
+        },
+        {
+          "name": "2.2 Login Admin Empresa",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Login exitoso admin empresa', () => {",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response).to.have.property('access');",
+                  "    pm.collectionVariables.set('empresa_token', response.access);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@techcorp.com\",\n  \"password\": \"admin123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/usuarios/login/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "usuarios", "login", ""]
+            }
+          }
+        },
+        {
+          "name": "2.3 Admin Empresa crea Empleado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{empresa_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"empleado@techcorp.com\",\n  \"password\": \"empleado123\",\n  \"nombres\": \"Pedro\",\n  \"apellidos\": \"Desarrollador\",\n  \"cargo\": \"Developer\",\n  \"empresa\": {{empresa_id}},\n  \"area\": {{area_id}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/usuarios/usuarios/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "usuarios", "usuarios", ""]
+            }
+          }
+        },
+        {
+          "name": "2.4 Admin Empresa crea Jefe de Área",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{empresa_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"jefe@techcorp.com\",\n  \"password\": \"jefe123\",\n  \"nombres\": \"María\",\n  \"apellidos\": \"Líder\",\n  \"cargo\": \"Team Lead\",\n  \"empresa\": {{empresa_id}},\n  \"area\": {{area_id}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/usuarios/usuarios/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "usuarios", "usuarios", ""]
+            }
+          }
+        },
+        {
+          "name": "2.5 Admin Empresa crea Validador Abastecimiento",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{empresa_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"abasto@techcorp.com\",\n  \"password\": \"abasto123\",\n  \"nombres\": \"Juan\",\n  \"apellidos\": \"Inventario\",\n  \"cargo\": \"Validador Stock\",\n  \"empresa\": {{empresa_id}},\n  \"area\": {{area_id}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/usuarios/usuarios/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "usuarios", "usuarios", ""]
+            }
+          }
+        },
+        {
+          "name": "2.6 Admin Empresa crea Validador Financiero",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{empresa_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"finanzas@techcorp.com\",\n  \"password\": \"finanzas123\",\n  \"nombres\": \"Ana\",\n  \"apellidos\": \"Contadora\",\n  \"cargo\": \"Validador Financiero\",\n  \"empresa\": {{empresa_id}},\n  \"area\": {{area_id}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/usuarios/usuarios/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "usuarios", "usuarios", ""]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🎯 3. ASIGNACIÓN DE ROLES",
+      "item": [
+        {
+          "name": "3.1 Asignar Admin Empresa (ID: 2)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"grupo_name\": \"Admin Empresa\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/usuarios/2/asignar-rol/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "usuarios", "2", "asignar-rol", ""]
+            }
+          }
+        },
+        {
+          "name": "3.2 Asignar Jefe de Área (ID: 4)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{empresa_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"es_jefe_area\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/usuarios/4/jefe-area/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "usuarios", "4", "jefe-area", ""]
+            }
+          }
+        },
+        {
+          "name": "3.3 Asignar Rol Jefe de Área (ID: 4)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{empresa_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"grupo_name\": \"Jefe de Área\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/usuarios/4/asignar-rol/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "usuarios", "4", "asignar-rol", ""]
+            }
+          }
+        },
+        {
+          "name": "3.4 Asignar Validador Abastecimiento (ID: 5)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{empresa_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"grupo_name\": \"Validador Abastecimiento\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/usuarios/5/asignar-rol/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "usuarios", "5", "asignar-rol", ""]
+            }
+          }
+        },
+        {
+          "name": "3.5 Asignar Validador Financiero (ID: 6)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{empresa_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"grupo_name\": \"Validador Financiero\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/usuarios/6/asignar-rol/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "usuarios", "6", "asignar-rol", ""]
+            }
+          }
+        },
+        {
+          "name": "3.6 Asignar Empleado (ID: 3)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{empresa_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"grupo_name\": \"Empleado\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/usuarios/3/asignar-rol/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "usuarios", "3", "asignar-rol", ""]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🔐 4. LOGIN TODOS LOS USUARIOS",
+      "item": [
+        {
+          "name": "4.1 Login Empleado",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Login empleado exitoso', () => {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('empleado_token', response.access);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"empleado@techcorp.com\",\n  \"password\": \"empleado123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/usuarios/login/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "usuarios", "login", ""]
+            }
+          }
+        },
+        {
+          "name": "4.2 Login Jefe de Área",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Login jefe exitoso', () => {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('jefe_token', response.access);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"jefe@techcorp.com\",\n  \"password\": \"jefe123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/usuarios/login/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "usuarios", "login", ""]
+            }
+          }
+        },
+        {
+          "name": "4.3 Login Validador Abastecimiento",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Login abasto exitoso', () => {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('abasto_token', response.access);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"abasto@techcorp.com\",\n  \"password\": \"abasto123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/usuarios/login/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "usuarios", "login", ""]
+            }
+          }
+        },
+        {
+          "name": "4.4 Login Validador Financiero",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Login finanzas exitoso', () => {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('finanzas_token', response.access);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"finanzas@techcorp.com\",\n  \"password\": \"finanzas123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/usuarios/login/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "usuarios", "login", ""]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "✅ 5. FLUJO EXITOSO COMPLETO",
+      "item": [
+        {
+          "name": "5.1 Empleado crea Solicitud",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', () => {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Solicitud creada en estado pendiente_jefe_area', () => {",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.estado).to.equal('pendiente_jefe_area');",
+                  "    pm.collectionVariables.set('solicitud_id', response.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{empleado_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"empresa\": {{empresa_id}},\n  \"justificacion\": \"Renovación equipos Q4 - Testing Postman\",\n  \"items\": [\n    {\n      \"producto\": {{producto_id}},\n      \"cantidad\": 3,\n      \"justificacion\": \"Laptops para desarrollo\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/solicitudes/crear/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "solicitudes", "crear", ""]
+            }
+          }
+        },
+        {
+          "name": "5.2 Jefe Aprueba (PASO 1)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Solicitud aprobada por jefe - estado pendiente_abastecimiento', () => {",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.solicitud.estado).to.equal('pendiente_abastecimiento');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jefe_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"comentario\": \"Aprobado por jefe - necesario para proyecto Q4\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/solicitudes/{{solicitud_id}}/aprobar-jefe/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "solicitudes", "{{solicitud_id}}", "aprobar-jefe", ""]
+            }
+          }
+        },
+        {
+          "name": "5.3 Validador Abastecimiento Aprueba (PASO 2)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Solicitud aprobada por abastecimiento - estado pendiente_finanzas', () => {",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.solicitud.estado).to.equal('pendiente_finanzas');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{abasto_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"aprobar\": true,\n  \"comentario\": \"Stock validado - proceder con solicitud\",\n  \"stock_disponible\": 50\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/solicitudes/{{solicitud_id}}/validar-abastecimiento/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "solicitudes", "{{solicitud_id}}", "validar-abastecimiento", ""]
+            }
+          }
+        },
+        {
+          "name": "5.4 Validador Financiero Aprueba (PASO 3)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Solicitud aprobada por finanzas - estado aprobada', () => {",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.solicitud.estado).to.equal('aprobada');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{finanzas_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"aprobar\": true,\n  \"comentario\": \"Presupuesto Q4 aprobado - proceder\",\n  \"presupuesto_disponible\": 75000.00\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/solicitudes/{{solicitud_id}}/validar-finanzas/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "solicitudes", "{{solicitud_id}}", "validar-finanzas", ""]
+            }
+          }
+        },
+        {
+          "name": "5.5 Lambda Convierte a Pedido (PASO 4)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', () => {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Pedido creado exitosamente', () => {",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response).to.have.property('numero_pedido');",
+                  "    pm.collectionVariables.set('pedido_id', response.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"solicitud_id\": {{solicitud_id}},\n  \"observaciones\": \"Conversión automática desde solicitud aprobada\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/pedidos/pedidos/crear-desde-solicitud/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "pedidos", "pedidos", "crear-desde-solicitud", ""]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "❌ 6. CASOS DE RECHAZO",
+      "item": [
+        {
+          "name": "6.1 Empleado crea Solicitud para Rechazo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', () => {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Solicitud creada para rechazo', () => {",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.estado).to.equal('pendiente_jefe_area');",
+                  "    pm.environment.set('solicitud_rechazo_id', response.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{empleado_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"empresa\": {{empresa_id}},\n  \"justificacion\": \"Solicitud que será rechazada - Testing\",\n  \"items\": [\n    {\n      \"producto\": {{producto_id}},\n      \"cantidad\": 10,\n      \"justificacion\": \"Muchas laptops - será rechazada\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/solicitudes/crear/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "solicitudes", "crear", ""]
+            }
+          }
+        },
+        {
+          "name": "6.2 Jefe Rechaza Solicitud",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Solicitud rechazada por jefe', () => {",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.solicitud.estado).to.equal('rechazada_jefe_area');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jefe_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"comentario\": \"Rechazado - cantidad excesiva, no prioritario\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/solicitudes/{{solicitud_rechazo_id}}/rechazar-jefe/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "solicitudes", "{{solicitud_rechazo_id}}", "rechazar-jefe", ""]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🚫 7. TESTS DE PERMISOS NEGADOS",
+      "item": [
+        {
+          "name": "7.1 Empleado intenta aprobar (DEBE FALLAR)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 403 Forbidden', () => {",
+                  "    pm.response.to.have.status(403);",
+                  "});",
+                  "",
+                  "pm.test('Error de permisos correcto', () => {",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.error).to.include('jefe');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{empleado_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"comentario\": \"Empleado NO puede aprobar\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/solicitudes/{{solicitud_id}}/aprobar-jefe/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "solicitudes", "{{solicitud_id}}", "aprobar-jefe", ""]
+            }
+          }
+        },
+        {
+          "name": "7.2 Jefe intenta validar abastecimiento (DEBE FALLAR)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 403 Forbidden', () => {",
+                  "    pm.response.to.have.status(403);",
+                  "});",
+                  "",
+                  "pm.test('Error de permisos validación', () => {",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.error).to.include('abastecimiento');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jefe_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"aprobar\": true,\n  \"comentario\": \"Jefe NO puede validar abastecimiento\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/solicitudes/{{solicitud_id}}/validar-abastecimiento/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "solicitudes", "{{solicitud_id}}", "validar-abastecimiento", ""]
+            }
+          }
+        },
+        {
+          "name": "7.3 Empleado intenta crear empresa (DEBE FALLAR)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 403 Forbidden', () => {",
+                  "    pm.response.to.have.status(403);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{empleado_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Empresa Falsa\",\n  \"sector\": \"TEST\",\n  \"nit\": \"123456789\",\n  \"correo_contacto\": \"fake@empresa.com\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/empresas/empresas/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "empresas", "empresas", ""]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "📊 8. CONSULTAS Y LISTADOS",
+      "item": [
+        {
+          "name": "8.1 Listar Solicitudes (Admin Empresa)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Ve solo solicitudes de su empresa', () => {",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.results).to.be.an('array');",
+                  "    // Verificar que todas las solicitudes son de TechCorp",
+                  "    response.results.forEach(solicitud => {",
+                  "        pm.expect(solicitud.empresa).to.equal(parseInt(pm.collectionVariables.get('empresa_id')));",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{empresa_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/solicitudes/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "solicitudes", ""]
+            }
+          }
+        },
+        {
+          "name": "8.2 Listar Usuarios (Admin Empresa)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Ve solo usuarios de su empresa', () => {",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.results).to.be.an('array');",
+                  "    // Verificar que tiene al menos los usuarios creados",
+                  "    pm.expect(response.results.length).to.be.at.least(4);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{empresa_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/usuarios/empleados/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "usuarios", "empleados", ""]
+            }
+          }
+        },
+        {
+          "name": "8.3 Ver Productos (Cualquier usuario)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Ve catálogo de productos', () => {",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.results).to.be.an('array');",
+                  "    pm.expect(response.results.length).to.be.at.least(1);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{empleado_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/productos/productos/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "productos", "productos", ""]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🏭 9. FLUJO LAMBDA (ADMIN)",
+      "item": [
+        {
+          "name": "9.1 Listar Todas las Empresas (Solo Lambda)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Admin Lambda ve todas las empresas', () => {",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.results).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/empresas/empresas/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "empresas", "empresas", ""]
+            }
+          }
+        },
+        {
+          "name": "9.2 Confirmar Pedido (Lambda)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"observaciones\": \"Confirmado por Lambda - stock disponible\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/pedidos/pedidos/{{pedido_id}}/confirmar/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "pedidos", "pedidos", "{{pedido_id}}", "confirmar", ""]
+            }
+          }
+        },
+        {
+          "name": "9.3 Procesar Pedido (Lambda)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"observaciones\": \"Procesado automáticamente\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/pedidos/pedidos/{{pedido_id}}/procesar/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "pedidos", "pedidos", "{{pedido_id}}", "procesar", ""]
+            }
+          }
+        },
+        {
+          "name": "9.4 Facturar Pedido (Lambda)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"observaciones\": \"Facturado automáticamente\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/pedidos/pedidos/{{pedido_id}}/facturar/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "pedidos", "pedidos", "{{pedido_id}}", "facturar", ""]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

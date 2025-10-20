@@ -70,6 +70,7 @@ class CrearEmpleadoSerializer(serializers.ModelSerializer):
 
 class ActivarCuentaSerializer(serializers.Serializer):
     nombres = serializers.CharField(max_length=255)
+    apellidos = serializers.CharField(max_length=255, required=False, allow_blank=True)
     celular = serializers.CharField(max_length=20)
     cargo = serializers.CharField(max_length=255)
     password = serializers.CharField(write_only=True, min_length=8)
@@ -89,6 +90,8 @@ class ActivarCuentaSerializer(serializers.Serializer):
         data = self.validated_data
 
         usuario.nombres = data["nombres"]
+        if data.get("apellidos"):
+            usuario.apellidos = data["apellidos"]
         usuario.celular = data["celular"]
         usuario.cargo = data["cargo"]
         usuario.set_password(data["password"])

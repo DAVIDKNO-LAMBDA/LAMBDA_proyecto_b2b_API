@@ -16,13 +16,19 @@ urlpatterns = [
     path('<int:pk>/', views.detalle_solicitud, name='detalle-solicitud'),
     
     # =============================================
-    # HU12 - VALIDACIÓN ABASTECIMIENTO
+    # 🆕 APROBACIÓN POR JEFE DE ÁREA (PRIMER PASO)
+    # =============================================
+    path('<int:pk>/aprobar-jefe/', views.aprobar_por_jefe, name='aprobar-por-jefe'),
+    path('<int:pk>/rechazar-jefe/', views.rechazar_por_jefe, name='rechazar-por-jefe'),
+    
+    # =============================================
+    # HU12 - VALIDACIÓN ABASTECIMIENTO EMPRESA
     # =============================================
     path('<int:pk>/validar-abastecimiento/', views.validar_abastecimiento, name='validar-abastecimiento'),
     path('pendientes-abastecimiento/', views.solicitudes_pendientes_abastecimiento, name='pendientes-abastecimiento'),
     
     # =============================================
-    # HU13 - VALIDACIÓN FINANZAS
+    # HU13 - VALIDACIÓN FINANZAS EMPRESA  
     # =============================================
     path('<int:pk>/validar-finanzas/', views.validar_finanzas, name='validar-finanzas'),
     path('pendientes-finanzas/', views.solicitudes_pendientes_finanzas, name='pendientes-finanzas'),

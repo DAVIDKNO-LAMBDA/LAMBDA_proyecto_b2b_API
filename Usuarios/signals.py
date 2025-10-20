@@ -50,20 +50,88 @@ def asignar_rol_inicial_signal(sender, instance, created, update_fields, **kwarg
                 # Primer usuario de la empresa → Admin Empresa
                 grupo = Group.objects.get(name='Admin Empresa')
                 instance.groups.add(grupo)
+                
+                # ASIGNAR PERMISOS JSON PARA ADMIN EMPRESA
+                instance.permisos_personalizados = {
+                    'puede_crear_solicitudes': True,
+                    'validador_finanzas': True,
+                    'validador_abastecimiento': True,
+                    'puede_crear_usuarios': True,
+                    'puede_ver_todas_solicitudes': True,
+                    'limite_aprobacion': 1000000  # Sin límite
+                }
+                instance.save(update_fields=['permisos_personalizados'])
+                
                 logger.info(f"✅ [SIGNAL] Rol 'Admin Empresa' asignado a {instance.email}")
             
             elif instance.area:
                 # Usuario con área asignada → Jefe de Área
                 grupo = Group.objects.get(name='Jefe de Área')
                 instance.groups.add(grupo)
+                
+                # ASIGNAR PERMISOS JSON PARA JEFE DE ÁREA
+                instance.permisos_personalizados = {
+                    'puede_crear_solicitudes': True,
+                    'validador_finanzas': False,
+                    'validador_abastecimiento': True,
+                    'puede_crear_usuarios': True,
+                    'puede_ver_solicitudes_area': True,
+                    'limite_aprobacion': 50000
+                }
+                instance.save(update_fields=['permisos_personalizados'])
+                
                 logger.info(f"✅ [SIGNAL] Rol 'Jefe de Área' asignado a {instance.email}")
             
             else:
                 # Usuario sin área → Empleado básico
                 grupo = Group.objects.get(name='Empleado')
                 instance.groups.add(grupo)
+                
+                # ASIGNAR PERMISOS JSON PARA EMPLEADO
+                instance.permisos_personalizados = {
+                    'puede_crear_solicitudes': True,
+                    'validador_finanzas': False,
+                    'validador_abastecimiento': False,
+                    'puede_crear_usuarios': False,
+                    'puede_ver_solicitudes_propias': True,
+                    'limite_aprobacion': 5000
+                }
+                instance.save(update_fields=['permisos_personalizados'])
+                
                 logger.info(f"✅ [SIGNAL] Rol 'Empleado' asignado a {instance.email}")
         
         except Group.DoesNotExist as e:
             logger.error(f"❌ [SIGNAL] Error: Grupo no encontrado - {str(e)}")
+            logger.warning("⚠️ Ejecuta: python manage.py bootstrap_roles")
+
+
+@receiver(post_save, sender=Usuario) 
+def asignar_permisos_lambda_signal(sender, instance, created, **kwargs):
+    """
+    Signal especial para usuarios Lambda con permisos completos
+    """
+    if created and not instance.empresa:  # Usuario Lambda (sin empresa)
+        # Asignar rol Admin Lambda
+        try:
+            grupo = Group.objects.get(name='Admin Lambda')
+            instance.groups.add(grupo)
+            
+            # PERMISOS COMPLETOS PARA LAMBDA
+            instance.permisos_personalizados = {
+                'puede_crear_solicitudes': True,
+                'validador_finanzas': True,
+                'validador_abastecimiento': True,
+                'puede_crear_usuarios': True,
+                'puede_ver_todas_solicitudes': True,
+                'puede_gestionar_pagos': True,
+                'puede_facturar': True,
+                'limite_aprobacion': 999999999,  # Sin límite
+                'es_usuario_lambda': True
+            }
+            instance.save(update_fields=['permisos_personalizados'])
+            
+            logger.info(f"✅ [SIGNAL] Permisos Lambda completos asignados a {instance.email}")
+            
+        except Group.DoesNotExist:
+            logger.error("❌ [SIGNAL] Grupo 'Admin Lambda' no existe")
             logger.warning("⚠️ Ejecuta: python manage.py bootstrap_roles")

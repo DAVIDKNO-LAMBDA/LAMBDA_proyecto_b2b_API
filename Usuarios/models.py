@@ -6,6 +6,9 @@ from django.utils import timezone
 from django.core.exceptions import ValidationError
 from Base.models import BaseModel
 from Empresas.models import Empresa, Area
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class UsuarioManager(BaseUserManager):
@@ -29,6 +32,15 @@ class UsuarioManager(BaseUserManager):
                 area = Area.objects.get(id=area)
             except Area.DoesNotExist:
                 raise ValueError("El área especificada no existe.")
+        
+        # 🆕 ACTIVACIÓN OBLIGATORIA PARA USUARIOS EMPRESA
+        # Si es usuario de empresa (no Lambda), debe activar por correo
+        if empresa is not None:  # Usuario pertenece a una empresa = no es Lambda
+            extra_fields.setdefault('estado', 'pendiente_activacion')
+            extra_fields.setdefault('is_active', False)  # Inactivo hasta activación
+        else:  # Usuario Lambda puede estar activo directamente
+            extra_fields.setdefault('estado', 'activo')
+            extra_fields.setdefault('is_active', True)
         
         user = self.model(
             email=email,
@@ -151,6 +163,29 @@ class Usuario(BaseModel, AbstractBaseUser, PermissionsMixin):
         help_text="Permisos dinámicos: validadores, límites, etc."
     )
     
+    # 🆕 CAMPO NUEVO - Es jefe de área
+    es_jefe_area = models.BooleanField(
+        default=False,
+        verbose_name="Es Jefe de Área",
+        help_text="Puede aprobar solicitudes de su área"
+    )
+    
+    # 🆕 CAMPO NUEVO - Área interna de Lambda
+    AREA_LAMBDA_CHOICES = [
+        ('abastecimiento', 'Área Abastecimiento Lambda'),
+        ('finanzas', 'Área Finanzas Lambda'),
+        ('administracion', 'Área Administración Lambda'),
+        ('ventas', 'Área Ventas Lambda'),
+    ]
+    area_lambda = models.CharField(
+        max_length=20,
+        choices=AREA_LAMBDA_CHOICES,
+        null=True,
+        blank=True,
+        verbose_name="Área Lambda",
+        help_text="Área interna de Lambda (solo para usuarios Lambda)"
+    )
+    
     # =============================================
     # TRAZABILIDAD
     # =============================================
@@ -181,39 +216,45 @@ class Usuario(BaseModel, AbstractBaseUser, PermissionsMixin):
         # PERMISOS PERSONALIZADOS DE DJANGO
         # =============================================
         permissions = [
-            # GESTIÓN DE USUARIOS
+            # GESTIÓN DE USUARIOS (HU04-07)
             ("puede_crear_usuarios", "Puede crear usuarios"),
             ("puede_editar_usuarios", "Puede editar usuarios"),
             ("puede_eliminar_usuarios", "Puede eliminar usuarios"),
             ("puede_activar_usuarios", "Puede activar/desactivar usuarios"),
             
-            # GESTIÓN DE ÁREAS Y ROLES
+            # GESTIÓN DE ÁREAS Y ROLES (HU08-09)
             ("puede_asignar_areas", "Puede asignar áreas a usuarios"),
             ("puede_asignar_roles", "Puede asignar roles a usuarios"),
+            ("puede_asignar_validadores", "Puede asignar validadores especiales (HU09)"),
+            ("puede_asignar_jefe_area", "Puede asignar/quitar jefe de área"),
             ("puede_ver_todos_usuarios", "Puede ver todos los usuarios"),
             
-            # GESTIÓN DE PEDIDOS (Para futuras HU)
-            ("puede_crear_solicitudes", "Puede crear solicitudes internas"),
+            # GESTIÓN DE SOLICITUDES (HU10-14)
+            ("puede_crear_solicitudes", "Puede crear solicitudes internas (HU10)"),
             ("puede_editar_solicitudes", "Puede editar solicitudes propias"),
             ("puede_ver_solicitudes_propias", "Puede ver sus propias solicitudes"),
             ("puede_ver_solicitudes_area", "Puede ver solicitudes de su área"),
             ("puede_ver_todas_solicitudes", "Puede ver todas las solicitudes"),
             
-            # VALIDACIONES (HU12, HU13)
-            ("puede_validar_abastecimiento", "Puede validar solicitudes (Abastecimiento)"),
-            ("puede_validar_finanzas", "Puede validar solicitudes (Finanzas)"),
-            ("puede_aprobar_pedidos", "Puede aprobar pedidos finales"),
+            # VALIDACIONES ESPECÍFICAS (HU12-13)
+            ("puede_aprobar_solicitudes_jefe", "Puede aprobar solicitudes como Jefe de Área"),
+            ("puede_validar_abastecimiento", "Puede validar solicitudes - Abastecimiento (HU12)"),
+            ("puede_validar_finanzas", "Puede validar solicitudes - Finanzas (HU13)"),
+            
+            # GESTIÓN DE PEDIDOS (HU14-15)
+            ("puede_aprobar_pedidos", "Puede aprobar pedidos"),
             ("puede_rechazar_pedidos", "Puede rechazar pedidos"),
+            ("puede_aprobar_credito", "Puede aprobar crédito/condiciones pago (HU15)"),
+            ("puede_definir_condiciones_pago", "Puede definir condiciones de pago (HU15)"),
             
-            # PRODUCTOS Y CATÁLOGO
-            ("puede_ver_catalogo", "Puede ver catálogo de productos"),
-            ("puede_ver_precios", "Puede ver precios de productos"),
-            ("puede_solicitar_productos", "Puede solicitar productos"),
+            # GESTIÓN DE PAGOS (HU16-19)
+            ("puede_gestionar_pagos", "Puede gestionar y validar pagos (HU16)"),
+            ("puede_facturar", "Puede marcar pedidos como facturados"),
             
-            # REPORTES
+            # REPORTES (HU24-26)
             ("puede_ver_reportes_basicos", "Puede ver reportes básicos"),
-            ("puede_ver_reportes_avanzados", "Puede ver reportes avanzados"),
-            ("puede_exportar_reportes", "Puede exportar reportes"),
+            ("puede_ver_reportes_avanzados", "Puede ver reportes avanzados (HU24-26)"),
+            ("puede_exportar_reportes", "Puede exportar reportes a PDF/Excel"),
         ]
     
     def __str__(self):
@@ -263,8 +304,8 @@ class Usuario(BaseModel, AbstractBaseUser, PermissionsMixin):
         """Verifica si el usuario es Admin de Empresa"""
         return self.groups.filter(name='Admin Empresa').exists()
     
-    def es_jefe_area(self) -> bool:
-        """Verifica si el usuario es Jefe de Área"""
+    def tiene_rol_jefe_area(self) -> bool:
+        """Verifica si el usuario es Jefe de Área (por grupo)"""
         return self.groups.filter(name='Jefe de Área').exists()
     
     def es_empleado(self) -> bool:
@@ -274,6 +315,32 @@ class Usuario(BaseModel, AbstractBaseUser, PermissionsMixin):
     def obtener_roles(self) -> list:
         """Retorna lista de nombres de roles (grupos) del usuario"""
         return [grupo.name for grupo in self.groups.all()]
+    
+    # =============================================
+    # 🆕 MÉTODOS PARA ÁREAS LAMBDA
+    # =============================================
+    
+    def es_validador_abastecimiento_lambda(self) -> bool:
+        """Verifica si es validador del área de abastecimiento Lambda"""
+        return (self.es_usuario_lambda() and 
+                self.area_lambda == 'abastecimiento' and
+                self.groups.filter(name='Validador Abastecimiento Lambda').exists())
+    
+    def es_validador_finanzas_lambda(self) -> bool:
+        """Verifica si es validador del área de finanzas Lambda"""
+        return (self.es_usuario_lambda() and 
+                self.area_lambda == 'finanzas' and
+                self.groups.filter(name='Validador Financiero Lambda').exists())
+    
+    def puede_validar_abastecimiento_lambda(self) -> bool:
+        """Verifica si puede validar abastecimiento en Lambda"""
+        return (self.es_validador_abastecimiento_lambda() and
+                self.permisos_personalizados.get('validador_abastecimiento', False))
+    
+    def puede_validar_finanzas_lambda(self) -> bool:
+        """Verifica si puede validar finanzas en Lambda"""
+        return (self.es_validador_finanzas_lambda() and
+                self.permisos_personalizados.get('validador_finanzas', False))
     
     # =============================================
     # 🆕 MÉTODOS PARA PERMISOS PERSONALIZADOS (HU09)
@@ -291,13 +358,196 @@ class Usuario(BaseModel, AbstractBaseUser, PermissionsMixin):
         """Verifica si puede crear solicitudes internas (HU10)"""
         return (
             self.permisos_personalizados.get('puede_crear_solicitudes', False) or
-            self.es_jefe_area() or
+            self.tiene_rol_jefe_area() or self.es_jefe_area or
             self.es_admin_empresa()
         )
     
     def obtener_limite_aprobacion(self) -> int:
         """Retorna límite de aprobación financiera (para HU13)"""
         return self.permisos_personalizados.get('limite_aprobacion', 0)
+    
+    # =============================================
+    # PERMISOS ESPECÍFICOS PARA PEDIDOS (LAMBDA)
+    # =============================================
+    
+    def puede_gestionar_pagos(self) -> bool:
+        """Verifica si puede gestionar pagos de pedidos (HU16)"""
+        return self.permisos_personalizados.get('puede_gestionar_pagos', False)
+    
+        def puede_facturar(self) -> bool:
+            """Verifica si puede marcar pedidos como facturados"""
+            return self.permisos_personalizados.get('puede_facturar', False)    # =============================================
+    # 🆕 MÉTODOS PARA GESTIÓN JERÁRQUICA POR ÁREA
+    # =============================================
+    
+    def puede_gestionar_usuario(self, usuario_objetivo) -> bool:
+        """
+        Verifica si este usuario puede gestionar a otro usuario
+        Reglas jerárquicas:
+        1. Superusuarios pueden gestionar a todos
+        2. Admin empresa puede gestionar a todos los usuarios de su empresa
+        3. Jefe de área solo puede gestionar usuarios de su área específica
+        """
+        # Superusuario puede gestionar a todos
+        if self.is_superuser:
+            return True
+            
+        # Verificar que ambos usuarios sean de la misma empresa
+        if self.empresa != usuario_objetivo.empresa:
+            return False
+            
+        # Admin empresa puede gestionar a todos los usuarios de su empresa
+        if self.es_admin_empresa():
+            return True
+            
+        # Jefe de área solo puede gestionar usuarios de su área específica
+        if self.es_jefe_area and self.area:
+            return (usuario_objetivo.area == self.area and 
+                   usuario_objetivo != self)  # No puede gestionarse a sí mismo
+        
+        return False
+    
+    def obtener_usuarios_gestionables(self):
+        """
+        Retorna queryset de usuarios que este usuario puede gestionar
+        """
+        if self.is_superuser:
+            return Usuario.objects.all()
+            
+        if not self.empresa:
+            return Usuario.objects.none()
+            
+        # Filtrar por empresa
+        usuarios = Usuario.objects.filter(empresa=self.empresa)
+        
+        # Admin empresa puede ver todos los usuarios de su empresa
+        if self.es_admin_empresa():
+            return usuarios
+            
+        # Jefe de área solo puede ver usuarios de su área específica
+        if self.es_jefe_area and self.area:
+            return usuarios.filter(area=self.area).exclude(id=self.id)
+        
+        # Otros usuarios no pueden gestionar a nadie
+        return Usuario.objects.none()
+    
+    def puede_asignar_a_area(self, area_objetivo) -> bool:
+        """
+        Verifica si puede asignar usuarios a un área específica
+        """
+        if self.is_superuser:
+            return True
+            
+        if not self.empresa or not area_objetivo:
+            return False
+            
+        # Verificar que el área pertenezca a la misma empresa
+        if area_objetivo.empresa != self.empresa:
+            return False
+            
+        # Admin empresa puede asignar a cualquier área de su empresa
+        if self.es_admin_empresa():
+            return True
+            
+        # Jefe de área solo puede asignar a su área específica
+        if self.es_jefe_area and self.area:
+            return area_objetivo == self.area
+        
+        return False
+    
+    def obtener_areas_asignables(self):
+        """
+        Retorna queryset de áreas donde este usuario puede asignar personal
+        """
+        from Empresas.models import Area
+        
+        if self.is_superuser:
+            return Area.objects.all()
+            
+        if not self.empresa:
+            return Area.objects.none()
+            
+        # Filtrar por empresa
+        areas = Area.objects.filter(empresa=self.empresa)
+        
+        # Admin empresa puede asignar a cualquier área de su empresa
+        if self.es_admin_empresa():
+            return areas
+            
+        # Jefe de área solo puede asignar a su área específica
+        if self.es_jefe_area and self.area:
+            return areas.filter(id=self.area.id)
+        
+        return Area.objects.none()
+    
+    def puede_validar_solicitudes_area(self, area_solicitud) -> bool:
+        """
+        Verifica si puede validar solicitudes de un área específica
+        """
+        if self.is_superuser:
+            return True
+            
+        # Para usuarios Lambda (validación interna)
+        if self.es_usuario_lambda():
+            return (self.puede_validar_abastecimiento_lambda() or 
+                   self.puede_validar_finanzas_lambda())
+            
+        # Para usuarios empresa: jefe solo valida de su área
+        if self.es_jefe_area and self.area and area_solicitud:
+            return self.area == area_solicitud
+            
+        return False
+    
+    # =============================================
+    # 🆕 MÉTODOS PARA CONTROL DE ACTIVACIÓN
+    # =============================================
+    
+    def requiere_activacion(self) -> bool:
+        """
+        Verifica si el usuario requiere activación por correo
+        Usuarios empresa (no Lambda) siempre requieren activación
+        """
+        return self.empresa is not None
+    
+    def puede_autenticarse(self) -> bool:
+        """
+        Verifica si el usuario puede autenticarse
+        - Usuario debe estar activo (is_active=True)
+        - Usuario empresa debe haber completado activación (estado='activo')
+        - Usuario Lambda puede autenticarse directamente si is_active=True
+        """
+        if not self.is_active:
+            return False
+            
+        # Usuario Lambda (sin empresa) puede autenticarse si está activo
+        if self.empresa is None:
+            return True
+            
+        # Usuario empresa debe haber activado su cuenta
+        return self.estado == 'activo'
+    
+    def activar_cuenta(self, password=None):
+        """
+        Activa la cuenta del usuario completando el proceso de activación
+        """
+        if not self.requiere_activacion():
+            return True  # Usuario Lambda ya puede estar activo
+            
+        # Actualizar estado y activar
+        self.estado = 'activo'
+        self.is_active = True
+        self.fecha_activacion = timezone.now()
+        
+        # Establecer contraseña si se proporciona
+        if password:
+            self.set_password(password)
+            
+        # Limpiar token de activación
+        self.token_activacion = None
+        self.save()
+        
+        logger.info(f"✅ Usuario {self.email} activado exitosamente")
+        return True
     
     def obtener_permisos_detalle(self) -> dict:
         """
@@ -322,7 +572,10 @@ class Usuario(BaseModel, AbstractBaseUser, PermissionsMixin):
             'validadores': {
                 'finanzas': self.es_validador_finanzas(),
                 'abastecimiento': self.es_validador_abastecimiento(),
-            }
+                'pagos': self.puede_gestionar_pagos(),
+                'facturacion': self.puede_facturar(),
+            },
+            'es_lambda': self.es_usuario_lambda(),
         }
 
 

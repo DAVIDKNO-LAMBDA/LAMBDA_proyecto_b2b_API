@@ -68,7 +68,7 @@ class MovimientoInventario(BaseModel):
     )
     
     pedido = models.ForeignKey(
-        'Solicitudes.Pedido',
+        'Pedidos.Pedido',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,

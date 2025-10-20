@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recordatorio de Pago - Lambda Commerce</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f7fa;
+            color: #333;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 600px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        
+        /* Header dinámico según tipo de recordatorio */
+        .header {
+            padding: 30px 20px;
+            text-align: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .header.preventivo {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+        .header.vencimiento {
+            background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
+        }
+        .header.mora {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+        }
+        .header.legal {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+        }
+        
+        .header h1 {
+            margin: 0 0 10px 0;
+            font-size: 28px;
+            font-weight: 700;
+        }
+        .header .subtitle {
+            margin: 0;
+            font-size: 16px;
+            opacity: 0.9;
+        }
+        
+        /* Contenido principal */
+        .content {
+            padding: 30px;
+        }
+        
+        /* Alert box */
+        .alert {
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+            border-left: 5px solid;
+            font-weight: 600;
+        }
+        .alert.info {
+            background-color: #e3f2fd;
+            border-color: #2196f3;
+            color: #1565c0;
+        }
+        .alert.warning {
+            background-color: #fff3e0;
+            border-color: #ff9800;
+            color: #ef6c00;
+        }
+        .alert.danger {
+            background-color: #ffebee;
+            border-color: #f44336;
+            color: #c62828;
+        }
+        .alert.critical {
+            background-color: #fce4ec;
+            border-color: #e91e63;
+            color: #ad1457;
+        }
+        
+        /* Información del pedido */
+        .pedido-info {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 25px 0;
+            border: 1px solid #e9ecef;
+        }
+        .pedido-info h3 {
+            margin-top: 0;
+            color: #495057;
+            font-size: 18px;
+        }
+        .pedido-detail {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .pedido-detail:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+        .pedido-label {
+            font-weight: 600;
+            color: #6c757d;
+        }
+        .pedido-value {
+            color: #495057;
+            font-weight: 500;
+        }
+        
+        /* Botones de acción */
+        .actions {
+            text-align: center;
+            margin: 30px 0;
+        }
+        .btn {
+            display: inline-block;
+            padding: 15px 30px;
+            background-color: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 16px;
+            transition: background-color 0.3s ease;
+        }
+        .btn:hover {
+            background-color: #0056b3;
+        }
+        .btn.urgent {
+            background-color: #dc3545;
+        }
+        .btn.urgent:hover {
+            background-color: #c82333;
+        }
+        
+        /* Footer */
+        .footer {
+            background-color: #f8f9fa;
+            padding: 25px;
+            text-align: center;
+            border-top: 1px solid #e9ecef;
+            color: #6c757d;
+        }
+        .footer .contact-info {
+            margin-top: 15px;
+        }
+        .footer .contact-info p {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        
+        /* Responsive */
+        @media (max-width: 600px) {
+            .container {
+                margin: 10px;
+                border-radius: 8px;
+            }
+            .content {
+                padding: 20px;
+            }
+            .pedido-detail {
+                flex-direction: column;
+            }
+            .pedido-label {
+                margin-bottom: 5px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header dinámico -->
+        <div class="header {% if es_preventivo %}preventivo{% elif es_vencimiento %}vencimiento{% elif es_mora %}mora{% elif es_legal %}legal{% endif %}">
+            <h1>
+                {% if es_preventivo %}
+                    🔔 Recordatorio de Pago
+                {% elif es_vencimiento %}
+                    ⏰ Pago Vence Hoy
+                {% elif es_mora %}
+                    ⚠️ Pago Vencido
+                {% elif es_legal %}
+                    ⚖️ Aviso Legal
+                {% else %}
+                    💰 Gestión de Pago
+                {% endif %}
+            </h1>
+            <p class="subtitle">Pedido #{{ pedido.numero_pedido }}</p>
+        </div>
+        
+        <div class="content">
+            <!-- Alert principal -->
+            <div class="alert {% if es_preventivo %}info{% elif es_vencimiento %}warning{% elif es_mora %}danger{% elif es_legal %}critical{% else %}info{% endif %}">
+                {% if es_preventivo %}
+                    📅 Su pago está próximo a vencer. Le recordamos que tiene tiempo para realizar el pago.
+                {% elif es_vencimiento %}
+                    🚨 Su pago vence HOY. Por favor, realice el pago lo antes posible para evitar cargos por mora.
+                {% elif es_mora %}
+                    ❌ Su pago está VENCIDO. Es necesario que regularice su situación de inmediato.
+                {% elif es_legal %}
+                    ⚖️ AVISO LEGAL: Debido al tiempo transcurrido sin pago, se iniciarán acciones legales de cobro.
+                {% endif %}
+                
+                <br><strong>{{ mensaje_vencimiento }}</strong>
+            </div>
+            
+            <!-- Información del pedido -->
+            <div class="pedido-info">
+                <h3>📋 Detalles del Pedido</h3>
+                
+                <div class="pedido-detail">
+                    <span class="pedido-label">Número de Pedido:</span>
+                    <span class="pedido-value">#{{ pedido.numero_pedido }}</span>
+                </div>
+                
+                <div class="pedido-detail">
+                    <span class="pedido-label">Empresa:</span>
+                    <span class="pedido-value">{{ empresa.nombre }}</span>
+                </div>
+                
+                <div class="pedido-detail">
+                    <span class="pedido-label">Monto Total:</span>
+                    <span class="pedido-value">${{ pedido.monto_final|floatformat:0 }}</span>
+                </div>
+                
+                <div class="pedido-detail">
+                    <span class="pedido-label">Fecha Límite de Pago:</span>
+                    <span class="pedido-value">{{ pedido.fecha_limite_pago|date:"d/m/Y" }}</span>
+                </div>
+                
+                <div class="pedido-detail">
+                    <span class="pedido-label">Estado Actual:</span>
+                    <span class="pedido-value">{{ pedido.get_estado_display }}</span>
+                </div>
+            </div>
+            
+            <!-- Botón de acción -->
+            <div class="actions">
+                {% if es_legal %}
+                    <a href="{{ url_pago }}" class="btn urgent">⚖️ Regularizar Pago URGENTE</a>
+                {% elif es_mora %}
+                    <a href="{{ url_pago }}" class="btn urgent">🚨 Pagar Ahora</a>
+                {% else %}
+                    <a href="{{ url_pago }}" class="btn">💳 Realizar Pago</a>
+                {% endif %}
+            </div>
+            
+            <!-- Información adicional según tipo -->
+            {% if es_mora or es_legal %}
+                <div class="alert danger">
+                    <strong>⚠️ Importantes Consideraciones:</strong><br>
+                    • Se pueden aplicar intereses de mora<br>
+                    • Su acceso a nuevos pedidos puede verse restringido<br>
+                    • Se reportará en centrales de riesgo según política interna<br>
+                    {% if es_legal %}• Se iniciarán procesos legales de cobro{% endif %}
+                </div>
+            {% endif %}
+            
+            <!-- Instrucciones de pago -->
+            <div style="background-color: #e8f5e8; padding: 20px; border-radius: 8px; border-left: 5px solid #28a745;">
+                <h4 style="margin-top: 0; color: #155724;">💡 Métodos de Pago Disponibles</h4>
+                <ul style="margin-bottom: 0; color: #155724;">
+                    <li>Transferencia bancaria</li>
+                    <li>Pago PSE</li>
+                    <li>Tarjeta de crédito/débito</li>
+                    <li>Efectivo en oficinas Lambda</li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- Footer -->
+        <div class="footer">
+            <p><strong>Lambda Commerce Solutions</strong></p>
+            <div class="contact-info">
+                <p>📞 {{ telefono_contacto }}</p>
+                <p>📧 {{ email_contacto }}</p>
+                <p>🌐 www.lambda.com</p>
+                <p><small>Este es un mensaje automático, por favor no responder.</small></p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

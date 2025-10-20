@@ -85,49 +85,52 @@ def crear_solicitud(request):
 @permission_classes([IsAuthenticated])
 def listar_solicitudes(request):
     """
-    Lista solicitudes según el rol del usuario (HU11)
+    Lista solicitudes según el rol del usuario (HU11) - VERSIÓN MEJORADA
+    🆕 Usa validación jerárquica por área del modelo Usuario
+    - Superusuario: Todas las solicitudes
     - Admin Empresa: Todas las de su empresa
-    - Jefe de Área: Las de su área
+    - Jefe de Área: Solo las de su área específica
     - Empleado: Solo las propias
     """
     user = request.user
     
-    if not hasattr(user, 'empresa') or user.empresa is None:
+    # Superusuario puede ver todas
+    if user.is_superuser:
+        queryset_base = Solicitud.objects.filter(deleted_at__isnull=True)
+    elif not hasattr(user, 'empresa') or user.empresa is None:
         return Response(
             {"error": "Solo usuarios de empresa pueden listar solicitudes"},
             status=status.HTTP_403_FORBIDDEN
         )
-    
-    # Filtrar según permisos
-    if user.has_perm('Usuarios.puede_ver_todas_solicitudes'):
-        # Admin Empresa ve todas de su empresa
-        solicitudes = Solicitud.objects.filter(
-            empresa=user.empresa,
-            deleted_at__isnull=True
-        ).select_related(
-            'empresa', 'solicitante', 'validador_abastecimiento', 'validador_finanzas'
-        ).prefetch_related('items__producto')
-    
-    elif user.has_perm('Usuarios.puede_ver_solicitudes_area'):
-        # Jefe de Área ve las de su área
-        solicitudes = Solicitud.objects.filter(
-            empresa=user.empresa,
-            solicitante__area=user.area,
-            deleted_at__isnull=True
-        ).select_related(
-            'empresa', 'solicitante', 'validador_abastecimiento', 'validador_finanzas'
-        ).prefetch_related('items__producto')
-    
     else:
-        # Empleado ve solo las propias
-        solicitudes = Solicitud.objects.filter(
-            solicitante=user,
-            deleted_at__isnull=True
-        ).select_related(
-            'empresa', 'solicitante', 'validador_abastecimiento', 'validador_finanzas'
-        ).prefetch_related('items__producto')
+        # 🆕 FILTRADO MEJORADO SEGÚN JERARQUÍA
+        if user.es_admin_empresa():
+            # Admin Empresa ve todas de su empresa
+            queryset_base = Solicitud.objects.filter(
+                empresa=user.empresa,
+                deleted_at__isnull=True
+            )
+        elif user.es_jefe_area and user.area:
+            # Jefe de Área ve solo las de su área específica
+            queryset_base = Solicitud.objects.filter(
+                empresa=user.empresa,
+                solicitante__area=user.area,  # Solo de SU área
+                deleted_at__isnull=True
+            )
+        else:
+            # Empleado ve solo las propias
+            queryset_base = Solicitud.objects.filter(
+                solicitante=user,
+                deleted_at__isnull=True
+            )
     
-    # Filtros opcionales por query params
+    # Optimizar consultas
+    solicitudes = queryset_base.select_related(
+        'empresa', 'solicitante', 'solicitante__area', 
+        'validador_abastecimiento', 'validador_finanzas'
+    ).prefetch_related('items__producto')
+    
+    # 🆕 FILTROS OPCIONALES MEJORADOS
     estado = request.query_params.get('estado')
     if estado:
         solicitudes = solicitudes.filter(estado=estado)
@@ -140,12 +143,35 @@ def listar_solicitudes(request):
     if fecha_hasta:
         solicitudes = solicitudes.filter(created_at__lte=fecha_hasta)
     
+    # Filtro por área (solo para admin empresa)
+    area_id = request.query_params.get('area_id')
+    if area_id and user.es_admin_empresa():
+        solicitudes = solicitudes.filter(solicitante__area_id=area_id)
+    
     serializer = SolicitudSerializer(solicitudes, many=True)
+    
+    # 🆕 INFORMACIÓN ADICIONAL PARA EL FRONTEND
+    context_info = {
+        "permisos_usuario": {
+            "es_superuser": user.is_superuser,
+            "es_admin_empresa": user.es_admin_empresa() if hasattr(user, 'empresa') else False,
+            "es_jefe_area": user.es_jefe_area if hasattr(user, 'es_jefe_area') else False,
+            "puede_ver_todas": user.is_superuser or (hasattr(user, 'empresa') and user.es_admin_empresa()),
+            "area_gestion": user.area.nombre if hasattr(user, 'area') and user.area else None
+        },
+        "filtros_aplicados": {
+            "estado": estado,
+            "fecha_desde": fecha_desde,
+            "fecha_hasta": fecha_hasta,
+            "area_id": area_id
+        }
+    }
     
     return Response(
         {
             "count": solicitudes.count(),
-            "results": serializer.data
+            "results": serializer.data,
+            "context": context_info
         },
         status=status.HTTP_200_OK
     )
@@ -156,6 +182,7 @@ def listar_solicitudes(request):
 def detalle_solicitud(request, pk):
     """
     Obtiene el detalle de una solicitud específica
+    🆕 VERSIÓN MEJORADA CON VALIDACIÓN JERÁRQUICA
     """
     user = request.user
     solicitud = get_object_or_404(
@@ -164,37 +191,54 @@ def detalle_solicitud(request, pk):
         deleted_at__isnull=True
     )
     
-    # Validar acceso
-    if user.es_admin_empresa():
-        if solicitud.empresa != user.empresa:
-            return Response(
-                {"error": "No tienes acceso a esta solicitud"},
-                status=status.HTTP_403_FORBIDDEN
-            )
-    elif user.es_jefe_area():
-        if solicitud.solicitante.area != user.area:
-            return Response(
-                {"error": "Solo puedes ver solicitudes de tu área"},
-                status=status.HTTP_403_FORBIDDEN
-            )
-    else:
-        if solicitud.solicitante != user:
-            return Response(
-                {"error": "Solo puedes ver tus propias solicitudes"},
-                status=status.HTTP_403_FORBIDDEN
-            )
+    # 🆕 VALIDACIÓN DE ACCESO MEJORADA
+    puede_acceder = False
+    motivo_acceso = ""
+    
+    if user.is_superuser:
+        puede_acceder = True
+        motivo_acceso = "Superusuario"
+    elif hasattr(user, 'empresa') and user.empresa:
+        if user.es_admin_empresa() and solicitud.empresa == user.empresa:
+            puede_acceder = True
+            motivo_acceso = "Admin Empresa"
+        elif user.es_jefe_area and user.puede_validar_solicitudes_area(solicitud.solicitante.area):
+            puede_acceder = True
+            motivo_acceso = "Jefe de Área"
+        elif solicitud.solicitante == user:
+            puede_acceder = True
+            motivo_acceso = "Propietario"
+    
+    if not puede_acceder:
+        return Response(
+            {
+                "error": "No tienes acceso a esta solicitud",
+                "detalle": {
+                    "solicitud_area": solicitud.solicitante.area.nombre if solicitud.solicitante.area else "Sin área",
+                    "tu_area": user.area.nombre if hasattr(user, 'area') and user.area else "Sin área",
+                    "es_admin_empresa": user.es_admin_empresa() if hasattr(user, 'empresa') else False,
+                    "es_jefe_area": user.es_jefe_area if hasattr(user, 'es_jefe_area') else False
+                }
+            },
+            status=status.HTTP_403_FORBIDDEN
+        )
     
     serializer = SolicitudSerializer(solicitud)
     
     # Agregar historial de validaciones
     historial = HistorialValidacion.objects.filter(
         solicitud=solicitud
-    ).select_related('validador')
+    ).select_related('usuario').order_by('created_at')
     
     return Response(
         {
             "solicitud": serializer.data,
-            "historial": HistorialValidacionSerializer(historial, many=True).data
+            "historial": HistorialValidacionSerializer(historial, many=True).data,
+            "acceso_info": {
+                "motivo_acceso": motivo_acceso,
+                "puede_validar": user.puede_validar_solicitudes_area(solicitud.solicitante.area) if hasattr(user, 'area') else False,
+                "es_propietario": solicitud.solicitante == user
+            }
         },
         status=status.HTTP_200_OK
     )
@@ -537,3 +581,164 @@ def cancelar_solicitud(request, pk):
         {"mensaje": "Solicitud cancelada exitosamente"},
         status=status.HTTP_200_OK
     )
+
+
+# =============================================
+# 🆕 APROBACIÓN POR JEFE DE ÁREA (PRIMER PASO)
+# =============================================
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def aprobar_por_jefe(request, pk):
+    """
+    Aprueba una solicitud por el jefe de área (PRIMER PASO DEL FLUJO)
+    🆕 VERSIÓN MEJORADA CON VALIDACIÓN JERÁRQUICA POR ÁREA
+    Solo jefes pueden aprobar solicitudes de SU área específica
+    """
+    user = request.user
+    solicitud = get_object_or_404(
+        Solicitud,
+        pk=pk,
+        deleted_at__isnull=True
+    )
+    
+    # 🆕 VALIDACIÓN JERÁRQUICA MEJORADA
+    # Usar el método del modelo Usuario para validar permisos por área
+    if not user.puede_validar_solicitudes_area(solicitud.solicitante.area):
+        return Response(
+            {
+                "error": "No tienes permisos para validar solicitudes de esta área",
+                "detalle": {
+                    "tu_area": user.area.nombre if user.area else "Sin área",
+                    "area_solicitud": solicitud.solicitante.area.nombre if solicitud.solicitante.area else "Sin área",
+                    "es_jefe_area": user.es_jefe_area,
+                    "es_superuser": user.is_superuser
+                }
+            },
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    # Validar estado
+    if solicitud.estado != Solicitud.EstadoSolicitud.PENDIENTE_JEFE_AREA:
+        return Response(
+            {
+                "error": f"La solicitud está en estado '{solicitud.get_estado_display()}', no se puede aprobar"
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    comentario = request.data.get('comentario', '')
+    
+    try:
+        with transaction.atomic():
+            # Aprobar por jefe
+            solicitud.aprobar_por_jefe(user, comentario)
+            
+            # Crear historial con información detallada del área
+            HistorialValidacion.objects.create(
+                solicitud=solicitud,
+                validador=user,
+                tipo_validacion='JEFE_AREA',
+                resultado='APROBADO',
+                comentario=comentario
+            )
+            
+        logger.info(
+            f"✅ Solicitud {solicitud.numero_solicitud} aprobada por jefe {user.email}"
+        )
+        
+        return Response(
+            {
+                "mensaje": "Solicitud aprobada por jefe de área exitosamente",
+                "solicitud": SolicitudSerializer(solicitud).data,
+                "siguiente_paso": "Pendiente validación de abastecimiento"
+            },
+            status=status.HTTP_200_OK
+        )
+        
+    except Exception as e:
+        logger.error(f"❌ Error aprobando solicitud por jefe: {str(e)}")
+        return Response(
+            {"error": "Error interno del servidor"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def rechazar_por_jefe(request, pk):
+    """
+    Rechaza una solicitud por el jefe de área
+    🆕 VERSIÓN MEJORADA CON VALIDACIÓN JERÁRQUICA POR ÁREA
+    """
+    user = request.user
+    solicitud = get_object_or_404(
+        Solicitud,
+        pk=pk,
+        deleted_at__isnull=True
+    )
+    
+    # 🆕 VALIDACIÓN JERÁRQUICA MEJORADA
+    if not user.puede_validar_solicitudes_area(solicitud.solicitante.area):
+        return Response(
+            {
+                "error": "No tienes permisos para validar solicitudes de esta área",
+                "detalle": {
+                    "tu_area": user.area.nombre if user.area else "Sin área",
+                    "area_solicitud": solicitud.solicitante.area.nombre if solicitud.solicitante.area else "Sin área",
+                    "es_jefe_area": user.es_jefe_area,
+                    "es_superuser": user.is_superuser
+                }
+            },
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    # Validar estado
+    if solicitud.estado != Solicitud.EstadoSolicitud.PENDIENTE_JEFE_AREA:
+        return Response(
+            {
+                "error": f"La solicitud está en estado '{solicitud.get_estado_display()}', no se puede rechazar"
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    comentario = request.data.get('comentario', 'Rechazada por jefe de área')
+    
+    try:
+        with transaction.atomic():
+            # Rechazar por jefe
+            solicitud.rechazar_por_jefe(user, comentario)
+            
+            # Crear historial con información detallada
+            HistorialValidacion.objects.create(
+                solicitud=solicitud,
+                validador=user,
+                tipo_validacion='JEFE_AREA',
+                resultado='RECHAZADO',
+                comentario=comentario
+            )
+            
+        logger.info(
+            f"✅ Solicitud {solicitud.numero_solicitud} rechazada por jefe {user.email} "
+            f"(Área: {user.area.nombre if user.area else 'Sin área'})"
+        )
+        
+        return Response(
+            {
+                "mensaje": "Solicitud rechazada por jefe de área",
+                "solicitud": SolicitudSerializer(solicitud).data,
+                "motivo": comentario,
+                "validador": {
+                    "nombre": user.nombre_completo,
+                    "area": user.area.nombre if user.area else "Sin área"
+                }
+            },
+            status=status.HTTP_200_OK
+        )
+        
+    except Exception as e:
+        logger.error(f"❌ Error rechazando solicitud por jefe: {str(e)}")
+        return Response(
+            {"error": "Error interno del servidor"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

@@ -13,6 +13,9 @@ urlpatterns = [
     # Apps
     path("api/", include("Empresas.urls")),
     path("api/usuarios/", include("Usuarios.urls")),
-    path("api/productos/", include("Productos.urls")),  # ← AGREGAR
+    path("api/productos/", include("Productos.urls")),
     path("api/solicitudes/", include("Solicitudes.urls")),
+    path("api/pedidos/", include("Pedidos.urls")),
+    path("api/reportes/", include("Reportes.urls")),  # ← NUEVO
 ]
+

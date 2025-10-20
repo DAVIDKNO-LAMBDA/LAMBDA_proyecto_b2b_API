@@ -17,6 +17,12 @@ class EmpresaSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'fecha_creacion']
 
+class EmpresaListSerializer(serializers.ModelSerializer):
+    """Serializer simplificado para listados de empresas"""
+    class Meta:
+        model = Empresa
+        fields = ['id', 'nombre', 'nit', 'sector', 'estado']
+
 class AreaSerializer(serializers.ModelSerializer):
     class Meta:
         model = Area

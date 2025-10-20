@@ -35,7 +35,9 @@ LOCAL_APPS = [
     "Empresas.apps.EmpresasConfig",
     "Usuarios.apps.UsuariosConfig",
     "Productos.apps.ProductosConfig",
-    'Solicitudes.apps.SolicitudesConfig',  # ← CAMBIAR AQUÍ
+    'Solicitudes.apps.SolicitudesConfig',
+    'Pedidos.apps.PedidosConfig',
+    'Reportes.apps.ReportesConfig',  # ← NUEVO
 ]
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
@@ -47,6 +49,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "Base.middleware.ActivacionUsuarioMiddleware",  # 🆕 Middleware de activación
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]

@@ -55,11 +55,22 @@ class ListarUsuariosView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        empresa = self.request.user.empresa
+        """
+        Retorna usuarios según permisos jerárquicos:
+        - Superusuario: todos los usuarios
+        - Admin empresa: usuarios de su empresa
+        - Jefe área: usuarios de su área específica
+        """
+        usuario_actual = self.request.user
         activos = self.request.query_params.get("activos", "true").lower()
-        qs = User.objects.filter(empresa=empresa)
+        
+        # Usar el método de gestión jerárquica del modelo
+        qs = usuario_actual.obtener_usuarios_gestionables()
+        
+        # Filtrar por estado activo si se solicita
         if activos in ("true", "1", "yes", "t"):
             qs = qs.filter(is_active=True)
+            
         return qs.order_by("nombres", "apellidos")
 
 class UsuarioUpdateView(generics.UpdateAPIView):
@@ -71,18 +82,32 @@ class UsuarioUpdateView(generics.UpdateAPIView):
     lookup_field = "pk"
 
     def get_queryset(self):
-        return User.objects.filter(empresa=self.request.user.empresa)
+        """
+        Retorna usuarios que el usuario actual puede gestionar
+        """
+        return self.request.user.obtener_usuarios_gestionables()
 
     def update(self, request, *args, **kwargs):
-        usuario = self.get_object()
+        usuario_objetivo = self.get_object()
+        
+        # Verificar permisos jerárquicos
+        if not request.user.puede_gestionar_usuario(usuario_objetivo):
+            return Response(
+                {"detail": "No tienes permisos para gestionar este usuario."}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
         # Prevenimos que se modifiquen campos críticos como el email o la empresa
         data = request.data.copy()
         data.pop("email", None)
         data.pop("empresa", None)
-        ser = self.get_serializer(usuario, data=data, partial=True)
+        ser = self.get_serializer(usuario_objetivo, data=data, partial=True)
         ser.is_valid(raise_exception=True)
         ser.save()
-        return Response({"detail": f"Usuario '{usuario.email}' actualizado correctamente."}, status=status.HTTP_200_OK)
+        return Response(
+            {"detail": f"Usuario '{usuario_objetivo.email}' actualizado correctamente."}, 
+            status=status.HTTP_200_OK
+        )
 
 class ActivarCuentaView(generics.GenericAPIView):
     """
@@ -117,7 +142,19 @@ class AsignarPermisoUsuarioView(APIView):
     permission_classes = [permissions.IsAuthenticated, permissions.DjangoModelPermissions]
 
     def post(self, request, usuario_id):
-        usuario = get_object_or_404(User, id=usuario_id, empresa=request.user.empresa)
+        # Obtener el usuario objetivo y verificar permisos jerárquicos
+        try:
+            usuario_objetivo = User.objects.get(id=usuario_id)
+        except User.DoesNotExist:
+            return Response({"detail": "Usuario no encontrado."}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Verificar permisos jerárquicos
+        if not request.user.puede_gestionar_usuario(usuario_objetivo):
+            return Response(
+                {"detail": "No tienes permisos para gestionar este usuario."}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
         permiso_codename = request.data.get("permiso")
         asignar = bool(request.data.get("asignar", True))
         if not permiso_codename:
@@ -128,12 +165,15 @@ class AsignarPermisoUsuarioView(APIView):
             return Response({"detail": f"El permiso '{permiso_codename}' no existe."}, status=status.HTTP_400_BAD_REQUEST)
         
         if asignar:
-            usuario.user_permissions.add(permiso)
+            usuario_objetivo.user_permissions.add(permiso)
             accion = "asignado"
         else:
-            usuario.user_permissions.remove(permiso)
+            usuario_objetivo.user_permissions.remove(permiso)
             accion = "removido"
-        return Response({"detail": f"Permiso '{permiso_codename}' {accion} a {usuario.email} correctamente."}, status=status.HTTP_200_OK)
+        return Response(
+            {"detail": f"Permiso '{permiso_codename}' {accion} a {usuario_objetivo.email} correctamente."}, 
+            status=status.HTTP_200_OK
+        )
 
 class ToggleGrupoUsuarioView(APIView):
     """
@@ -142,7 +182,19 @@ class ToggleGrupoUsuarioView(APIView):
     permission_classes = [permissions.IsAuthenticated, permissions.DjangoModelPermissions]
 
     def post(self, request, usuario_id):
-        usuario = get_object_or_404(User, id=usuario_id, empresa=request.user.empresa)
+        # Obtener el usuario objetivo y verificar permisos jerárquicos
+        try:
+            usuario_objetivo = User.objects.get(id=usuario_id)
+        except User.DoesNotExist:
+            return Response({"detail": "Usuario no encontrado."}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Verificar permisos jerárquicos
+        if not request.user.puede_gestionar_usuario(usuario_objetivo):
+            return Response(
+                {"detail": "No tienes permisos para gestionar este usuario."}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
         grupo_nombre = request.data.get("grupo")
         asignar = bool(request.data.get("asignar", True))
         if not grupo_nombre:
@@ -153,13 +205,179 @@ class ToggleGrupoUsuarioView(APIView):
             return Response({"detail": f"El grupo '{grupo_nombre}' no existe."}, status=status.HTTP_400_BAD_REQUEST)
         
         if asignar:
-            usuario.groups.add(grupo)
+            usuario_objetivo.groups.add(grupo)
             accion = "asignado"
         else:
-            usuario.groups.remove(grupo)
+            usuario_objetivo.groups.remove(grupo)
             accion = "removido"
-        return Response({"detail": f"Grupo '{grupo_nombre}' {accion} a {usuario.email} correctamente."}, status=status.HTTP_200_OK)
+        return Response({"detail": f"Grupo '{grupo_nombre}' {accion} a {usuario_objetivo.email} correctamente."}, status=status.HTTP_200_OK)
 
+
+# =============================================
+# 🆕 VISTAS ESPECÍFICAS PARA GESTIÓN JERÁRQUICA POR ÁREA
+# =============================================
+
+class UsuariosAreaJefeView(generics.ListAPIView):
+    """
+    Vista específica para que los jefes de área listen solo usuarios de su área
+    """
+    serializer_class = UsuarioSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_queryset(self):
+        usuario_actual = self.request.user
+        
+        # Solo jefes de área pueden acceder
+        if not (usuario_actual.es_jefe_area or usuario_actual.tiene_rol_jefe_area()) or not usuario_actual.area:
+            return User.objects.none()
+            
+        # Retornar usuarios de su área específica (excluyéndose a sí mismo)
+        return User.objects.filter(
+            area=usuario_actual.area,
+            empresa=usuario_actual.empresa
+        ).exclude(id=usuario_actual.id).order_by("nombres", "apellidos")
+
+class AreasAsignablesJefeView(APIView):
+    """
+    Lista las áreas donde el usuario actual puede asignar personal
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request):
+        areas_asignables = request.user.obtener_areas_asignables()
+        areas_data = [
+            {
+                'id': area.id,
+                'nombre': area.nombre,
+                'descripcion': area.descripcion,
+                'tipo': area.tipo,
+                'es_area_base': getattr(area, 'es_area_base', False)
+            }
+            for area in areas_asignables
+        ]
+        
+        return Response({
+            'areas_asignables': areas_data,
+            'total': areas_asignables.count(),
+            'permisos': {
+                'es_admin_empresa': request.user.es_admin_empresa(),
+                'es_jefe_area': request.user.es_jefe_area or request.user.tiene_rol_jefe_area(),
+                'puede_asignar_multiple_areas': request.user.es_admin_empresa()
+            }
+        })
+
+class AsignarUsuarioAreaView(APIView):
+    """
+    Asigna un usuario a un área específica con verificación jerárquica
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def post(self, request):
+        usuario_id = request.data.get('usuario_id')
+        area_id = request.data.get('area_id')
+        
+        if not usuario_id or not area_id:
+            return Response(
+                {"detail": "Se requieren 'usuario_id' y 'area_id'."}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            usuario_objetivo = User.objects.get(id=usuario_id)
+            from Empresas.models import Area
+            area_objetivo = Area.objects.get(id=area_id)
+        except (User.DoesNotExist, Area.DoesNotExist):
+            return Response(
+                {"detail": "Usuario o área no encontrados."}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Verificar permisos jerárquicos
+        if not request.user.puede_gestionar_usuario(usuario_objetivo):
+            return Response(
+                {"detail": "No tienes permisos para gestionar este usuario."}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        if not request.user.puede_asignar_a_area(area_objetivo):
+            return Response(
+                {"detail": "No tienes permisos para asignar usuarios a esta área."}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Realizar la asignación
+        area_anterior = usuario_objetivo.area
+        usuario_objetivo.area = area_objetivo
+        usuario_objetivo.save()
+        
+        logger.info(
+            f"Usuario {usuario_objetivo.email} asignado de área "
+            f"'{area_anterior.nombre if area_anterior else 'Sin área'}' "
+            f"a '{area_objetivo.nombre}' por {request.user.email}"
+        )
+        
+        return Response({
+            "detail": f"Usuario {usuario_objetivo.email} asignado exitosamente al área {area_objetivo.nombre}.",
+            "usuario": {
+                "id": usuario_objetivo.id,
+                "email": usuario_objetivo.email,
+                "nombre_completo": usuario_objetivo.nombre_completo
+            },
+            "area_anterior": {
+                "id": area_anterior.id if area_anterior else None,
+                "nombre": area_anterior.nombre if area_anterior else "Sin área"
+            },
+            "area_nueva": {
+                "id": area_objetivo.id,
+                "nombre": area_objetivo.nombre
+            }
+        })
+
+class EstadisticasAreaJefeView(APIView):
+    """
+    Estadísticas para jefes de área sobre su gestión
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request):
+        usuario_actual = request.user
+        
+        if not (usuario_actual.es_jefe_area or usuario_actual.tiene_rol_jefe_area()) or not usuario_actual.area:
+            return Response(
+                {"detail": "Solo jefes de área pueden acceder a estas estadísticas."}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Obtener usuarios del área
+        usuarios_area = User.objects.filter(
+            area=usuario_actual.area,
+            empresa=usuario_actual.empresa
+        ).exclude(id=usuario_actual.id)
+        
+        # Calcular estadísticas
+        total_usuarios = usuarios_area.count()
+        usuarios_activos = usuarios_area.filter(is_active=True).count()
+        usuarios_pendientes = usuarios_area.filter(estado='pendiente_activacion').count()
+        
+        return Response({
+            'area': {
+                'id': usuario_actual.area.id,
+                'nombre': usuario_actual.area.nombre,
+                'descripcion': usuario_actual.area.descripcion,
+                'es_area_base': getattr(usuario_actual.area, 'es_area_base', False)
+            },
+            'estadisticas_usuarios': {
+                'total': total_usuarios,
+                'activos': usuarios_activos,
+                'pendientes_activacion': usuarios_pendientes,
+                'inactivos': total_usuarios - usuarios_activos
+            },
+            'permisos_jefe': {
+                'puede_asignar_roles': usuario_actual.es_admin_empresa() or usuario_actual.es_jefe_area or usuario_actual.tiene_rol_jefe_area(),
+                'puede_crear_usuarios': usuario_actual.es_admin_empresa(),
+                'puede_asignar_a_otras_areas': usuario_actual.es_admin_empresa()
+            }
+        })
 
 # =============================================
 # ACTIVACIÓN DE CUENTA
@@ -183,7 +401,7 @@ def activar_usuario(request, token):
         )
     
     # Validar datos del formulario de activación
-    serializer = ActivarUsuarioSerializer(data=request.data)
+    serializer = ActivarCuentaSerializer(data=request.data)
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
@@ -191,11 +409,11 @@ def activar_usuario(request, token):
     usuario.set_password(serializer.validated_data['password'])
     
     # Actualizar datos opcionales
-    if serializer.validated_data.get('first_name'):
-        usuario.first_name = serializer.validated_data['first_name']
+    if serializer.validated_data.get('nombres'):
+        usuario.nombres = serializer.validated_data['nombres']
     
-    if serializer.validated_data.get('last_name'):
-        usuario.last_name = serializer.validated_data['last_name']
+    if serializer.validated_data.get('apellidos'):
+        usuario.apellidos = serializer.validated_data['apellidos']
     
     if serializer.validated_data.get('celular'):
         usuario.celular = serializer.validated_data['celular']
@@ -207,7 +425,7 @@ def activar_usuario(request, token):
     
     # Guardar con update_fields para activar signal
     usuario.save(update_fields=[
-        'password', 'first_name', 'last_name', 'celular', 
+        'password', 'nombres', 'apellidos', 'celular', 
         'estado', 'fecha_activacion', 'token_activacion'
     ])
     
@@ -245,7 +463,7 @@ def listar_usuarios(request):
         usuarios = Usuario.objects.filter(empresa=user.empresa)
     
     # Jefe de Área ve usuarios de su área
-    elif user.es_jefe_area() and user.area:
+    elif (user.es_jefe_area or user.tiene_rol_jefe_area()) and user.area:
         usuarios = Usuario.objects.filter(empresa=user.empresa, area=user.area)
     
     # Otros solo ven su perfil
@@ -283,7 +501,7 @@ def detalle_usuario(request, pk):
                 status=status.HTTP_403_FORBIDDEN
             )
     
-    elif user.es_jefe_area():
+    elif user.es_jefe_area() or user.tiene_rol_jefe_area():
         if usuario.empresa != user.empresa or usuario.area != user.area:
             return Response(
                 {"error": "Solo puedes ver usuarios de tu área"},
@@ -311,13 +529,13 @@ def crear_usuario(request):
     user = request.user
     
     # Validar permisos
-    if not (user.es_admin_empresa() or user.es_jefe_area()):
+    if not (user.es_admin_empresa() or user.es_jefe_area or user.tiene_rol_jefe_area()):
         return Response(
             {"error": "No tienes permisos para crear usuarios"},
             status=status.HTTP_403_FORBIDDEN
         )
     
-    serializer = UsuarioCreateSerializer(data=request.data)
+    serializer = CrearEmpleadoSerializer(data=request.data)
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
@@ -339,7 +557,7 @@ def crear_usuario(request):
             creado_por=user
         )
     
-    elif user.es_jefe_area():
+    elif user.es_jefe_area or user.tiene_rol_jefe_area():
         # Jefe de Área debe especificar área
         if not area:
             return Response(
@@ -396,7 +614,7 @@ def actualizar_usuario(request, pk):
         )
     
     # Campos actualizables
-    campos_permitidos = ['first_name', 'last_name', 'cargo', 'celular']
+    campos_permitidos = ['nombres', 'apellidos', 'cargo', 'celular']
     
     for campo in campos_permitidos:
         if campo in request.data:
@@ -484,10 +702,13 @@ def listar_empleados(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def crear_empleado(request):
-    """Crea un nuevo empleado (HU05)"""
+    """
+    Crea un nuevo empleado (HU05) - VERSIÓN MEJORADA CON ACTIVACIÓN OBLIGATORIA
+    Todos los usuarios empresa requieren activación por correo
+    """
     user = request.user
     
-    # Validar permisos
+    # Validar permisos jerárquicos
     if not user.has_perm('Usuarios.puede_crear_usuarios'):
         return Response(
             {"error": "No tienes permiso para crear usuarios"},
@@ -499,30 +720,132 @@ def crear_empleado(request):
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
+    # 🆕 CREAR EMPLEADO CON ACTIVACIÓN OBLIGATORIA
     empleado = serializer.save()
     
-    # Crear token de activación
-    activacion = ActivacionUsuario.objects.create(usuario=empleado)
-    
-    # Enviar correo
-    try:
-        enviar_correo_activacion_usuario(empleado, user)
-        logger.info(f"✅ Empleado {empleado.email} creado y correo enviado")
-    except Exception as e:
-        logger.error(f"❌ Error enviando correo a {empleado.email}: {str(e)}")
+    # Verificar que el empleado requiere activación (usuarios empresa)
+    if empleado.requiere_activacion():
+        # Crear token de activación automáticamente
+        activacion = ActivacionUsuario.objects.create(usuario=empleado)
+        
+        # 🆕 ENVÍO AUTOMÁTICO DE CORREO DE ACTIVACIÓN
+        try:
+            enviar_correo_activacion_usuario(empleado, user)
+            logger.info(
+                f"✅ Empleado {empleado.email} creado exitosamente "
+                f"(Empresa: {empleado.empresa.nombre}, Área: {empleado.area.nombre if empleado.area else 'Sin área'}) "
+                f"- Correo de activación enviado"
+            )
+            mensaje_activacion = "Se ha enviado un correo de activación al empleado."
+        except Exception as e:
+            logger.error(f"❌ Error enviando correo a {empleado.email}: {str(e)}")
+            mensaje_activacion = "ADVERTENCIA: No se pudo enviar el correo de activación. Contacta al empleado manualmente."
+    else:
+        # Usuario Lambda - puede estar activo directamente
+        mensaje_activacion = "Usuario Lambda creado y activado automáticamente."
+        logger.info(f"✅ Usuario Lambda {empleado.email} creado y activado")
     
     return Response(
         {
-            "mensaje": "Empleado creado exitosamente. Se ha enviado correo de activación.",
-            "empleado": UsuarioSerializer(empleado).data
+            "mensaje": "Empleado creado exitosamente.",
+            "activacion": mensaje_activacion,
+            "empleado": {
+                "id": empleado.id,
+                "email": empleado.email,
+                "nombre_completo": empleado.nombre_completo,
+                "empresa": empleado.empresa.nombre if empleado.empresa else None,
+                "area": empleado.area.nombre if empleado.area else None,
+                "estado": empleado.estado,
+                "requiere_activacion": empleado.requiere_activacion(),
+                "puede_autenticarse": empleado.puede_autenticarse()
+            },
+            "siguiente_paso": (
+                "El empleado debe revisar su correo y completar la activación de su cuenta."
+                if empleado.requiere_activacion() 
+                else "El usuario puede iniciar sesión inmediatamente."
+            )
         },
         status=status.HTTP_201_CREATED
     )
 
 
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def reenviar_activacion(request):
+    """
+    Reenvía correo de activación para usuarios pendientes
+    Solo usuarios con permisos pueden solicitar reenvío
+    """
+    email = request.data.get('email')
+    if not email:
+        return Response(
+            {"error": "Se requiere el email del usuario"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    try:
+        usuario_objetivo = User.objects.get(email=email)
+    except User.DoesNotExist:
+        return Response(
+            {"error": "Usuario no encontrado"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    
+    # Verificar permisos jerárquicos
+    if not request.user.puede_gestionar_usuario(usuario_objetivo):
+        return Response(
+            {"error": "No tienes permisos para gestionar este usuario"},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    # Verificar que el usuario requiere activación
+    if not usuario_objetivo.requiere_activacion():
+        return Response(
+            {"error": "Este usuario no requiere activación (usuario Lambda)"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Verificar que está pendiente de activación
+    if usuario_objetivo.estado == 'activo':
+        return Response(
+            {"error": "Esta cuenta ya está activada"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Crear nuevo token de activación (invalidar el anterior)
+    ActivacionUsuario.objects.filter(usuario=usuario_objetivo).update(usado=True)
+    nueva_activacion = ActivacionUsuario.objects.create(usuario=usuario_objetivo)
+    
+    # Enviar correo
+    try:
+        enviar_correo_activacion_usuario(usuario_objetivo, request.user)
+        logger.info(f"✅ Correo de activación reenviado a {usuario_objetivo.email}")
+        
+        return Response(
+            {
+                "mensaje": f"Correo de activación reenviado exitosamente a {usuario_objetivo.email}",
+                "usuario": {
+                    "email": usuario_objetivo.email,
+                    "nombre_completo": usuario_objetivo.nombre_completo,
+                    "estado": usuario_objetivo.estado
+                }
+            },
+            status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        logger.error(f"❌ Error reenviando correo a {usuario_objetivo.email}: {str(e)}")
+        return Response(
+            {"error": "No se pudo enviar el correo de activación. Inténtalo más tarde."},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
 def activar_cuenta(request, token):
-    """Activa cuenta de usuario con token (HU04)"""
+    """
+    Activa cuenta de usuario con token (HU04) - FLUJO MEJORADO
+    Requiere completar perfil y establecer contraseña
+    """
     try:
         activacion = ActivacionUsuario.objects.select_related('usuario').get(
             token=token,
@@ -536,34 +859,74 @@ def activar_cuenta(request, token):
     
     if activacion.expirado():
         return Response(
-            {"error": "El token ha expirado"},
+            {"error": "El token ha expirado. Solicita un nuevo enlace de activación."},
             status=status.HTTP_400_BAD_REQUEST
         )
     
+    # Validar que el usuario aún requiere activación
+    usuario = activacion.usuario
+    if usuario.estado == 'activo':
+        return Response(
+            {"error": "Esta cuenta ya ha sido activada"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Validar datos del formulario de activación
     serializer = ActivarCuentaSerializer(
         data=request.data,
-        context={'usuario': activacion.usuario, 'activacion': activacion}
+        context={'usuario': usuario, 'activacion': activacion}
     )
     
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
-    usuario = serializer.save()
+    # 🆕 USAR MÉTODO MEJORADO DE ACTIVACIÓN
+    password = serializer.validated_data.get('password')
+    usuario.activar_cuenta(password=password)
     
-    # Asignar rol por defecto si es primer usuario
+    # Actualizar datos adicionales del perfil si se proporcionan
+    if serializer.validated_data.get('celular'):
+        usuario.celular = serializer.validated_data['celular']
+        usuario.save()
+    
+    # Marcar token como usado
+    activacion.usado = True
+    activacion.save()
+    
+    # 🆕 ASIGNACIÓN AUTOMÁTICA DE ROLES SEGÚN JERARQUÍA
+    # Si es primer usuario de la empresa -> Admin Empresa
+    # Si no, asignar rol base según área
     if usuario.es_primer_usuario:
         grupo = Group.objects.get(name='Admin Empresa')
         usuario.groups.add(grupo)
-        logger.info(f"✅ Rol 'Admin Empresa' asignado a {usuario.email}")
+        logger.info(f"✅ Rol 'Admin Empresa' asignado a {usuario.email} (primer usuario)")
     else:
+        # Asignar rol base Empleado por defecto
         grupo = Group.objects.get(name='Empleado')
         usuario.groups.add(grupo)
         logger.info(f"✅ Rol 'Empleado' asignado a {usuario.email}")
     
+    # 🆕 LOG DETALLADO DE ACTIVACIÓN
+    logger.info(
+        f"✅ Cuenta activada exitosamente: {usuario.email} "
+        f"(Empresa: {usuario.empresa.nombre if usuario.empresa else 'Lambda'}, "
+        f"Área: {usuario.area.nombre if usuario.area else 'Sin área'})"
+    )
+    
     return Response(
         {
-            "mensaje": "Cuenta activada exitosamente",
-            "usuario": UsuarioSerializer(usuario).data
+            "mensaje": "¡Cuenta activada exitosamente! Ya puedes iniciar sesión.",
+            "usuario": {
+                "id": usuario.id,
+                "email": usuario.email,
+                "nombre_completo": usuario.nombre_completo,
+                "empresa": usuario.empresa.nombre if usuario.empresa else None,
+                "area": usuario.area.nombre if usuario.area else None,
+                "estado": usuario.estado,
+                "fecha_activacion": usuario.fecha_activacion,
+                "roles": [grupo.name for grupo in usuario.groups.all()]
+            },
+            "siguiente_paso": "Puedes iniciar sesión con tu email y la contraseña que estableciste."
         },
         status=status.HTTP_200_OK
     )
@@ -598,7 +961,7 @@ def asignar_area(request, pk):
         )
     
     # Si es Jefe de Área, solo puede asignar a SU área
-    if user.es_jefe_area() and not user.es_admin_empresa():
+    if (user.es_jefe_area or user.tiene_rol_jefe_area()) and not user.es_admin_empresa():
         area_id = request.data.get('area_id')
         if area_id and int(area_id) != user.area_id:
             return Response(
@@ -747,6 +1110,73 @@ def remover_permisos_especiales(request, pk):
 
 
 # =============================================
+# 🆕 GESTIÓN DE JEFE DE ÁREA
+# =============================================
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def asignar_jefe_area(request, pk):
+    """
+    Asigna o quita el rol de jefe de área a un usuario
+    Solo Admin Empresa puede hacerlo
+    """
+    user = request.user
+    usuario_target = get_object_or_404(Usuario, pk=pk, deleted_at__isnull=True)
+    
+    # Solo Admin Empresa puede asignar jefes
+    if not user.es_admin_empresa():
+        return Response(
+            {"error": "Solo Admin Empresa puede asignar jefes de área"},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    # Validar que sea de la misma empresa
+    if usuario_target.empresa != user.empresa:
+        return Response(
+            {"error": "Solo puedes asignar jefes de área en tu empresa"},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    # Obtener acción (asignar/quitar)
+    es_jefe = request.data.get('es_jefe_area', False)
+    
+    estado_anterior = usuario_target.es_jefe_area
+    usuario_target.es_jefe_area = es_jefe
+    usuario_target.save(update_fields=['es_jefe_area', 'updated_at'])
+    
+    # Si se asigna como jefe, agregar al grupo "Jefe de Área"
+    if es_jefe:
+        grupo_jefe, _ = Group.objects.get_or_create(name='Jefe de Área')
+        usuario_target.groups.add(grupo_jefe)
+        accion = "asignado como"
+    else:
+        # Remover del grupo si existe
+        try:
+            grupo_jefe = Group.objects.get(name='Jefe de Área')
+            usuario_target.groups.remove(grupo_jefe)
+        except Group.DoesNotExist:
+            pass
+        accion = "removido como"
+    
+    logger.info(
+        f"✅ Usuario {usuario_target.email} {accion} jefe de área por {user.email}"
+    )
+    
+    return Response(
+        {
+            "mensaje": f"Usuario {accion} jefe de área exitosamente",
+            "usuario": UsuarioConPermisosSerializer(usuario_target).data,
+            "cambio": {
+                "estado_anterior": estado_anterior,
+                "estado_nuevo": es_jefe,
+                "accion": accion
+            }
+        },
+        status=status.HTTP_200_OK
+    )
+
+
+# =============================================
 # 🆕 CONSULTA DE PERMISOS Y GRUPOS
 # =============================================
 
@@ -831,7 +1261,7 @@ def ver_permisos_usuario(request, pk):
                 {"error": "Solo puedes ver permisos de usuarios de tu empresa"},
                 status=status.HTTP_403_FORBIDDEN
             )
-    elif user.es_jefe_area():
+    elif user.es_jefe_area() or user.tiene_rol_jefe_area():
         if usuario.area != user.area:
             return Response(
                 {"error": "Solo puedes ver permisos de usuarios de tu área"},

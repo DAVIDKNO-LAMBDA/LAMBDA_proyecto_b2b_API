@@ -1,6 +1,7 @@
 from django.db import models
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 from Base.models import BaseModel
 from Empresas.models import Empresa
 from Productos.models import Producto
@@ -14,11 +15,13 @@ class Solicitud(BaseModel):
     
     class EstadoSolicitud(models.TextChoices):
         BORRADOR = 'borrador', 'Borrador'
+        PENDIENTE_JEFE_AREA = 'pendiente_jefe_area', 'Pendiente Aprobación Jefe de Área'
+        RECHAZADA_JEFE_AREA = 'rechazada_jefe_area', 'Rechazada por Jefe de Área'
         PENDIENTE_ABASTECIMIENTO = 'pendiente_abastecimiento', 'Pendiente Abastecimiento'
         RECHAZADA_ABASTECIMIENTO = 'rechazada_abastecimiento', 'Rechazada por Abastecimiento'
         PENDIENTE_FINANZAS = 'pendiente_finanzas', 'Pendiente Finanzas'
         RECHAZADA_FINANZAS = 'rechazada_finanzas', 'Rechazada por Finanzas'
-        APROBADA = 'aprobada', 'Aprobada - Lista para Compra'
+        APROBADA = 'aprobada', 'Aprobada - Lista para Conversión'
         CONVERTIDA_PEDIDO = 'convertida_pedido', 'Convertida a Pedido'
         CANCELADA = 'cancelada', 'Cancelada'
     
@@ -49,8 +52,30 @@ class Solicitud(BaseModel):
     estado = models.CharField(
         max_length=30,
         choices=EstadoSolicitud.choices,
-        default=EstadoSolicitud.PENDIENTE_ABASTECIMIENTO,
+        default=EstadoSolicitud.PENDIENTE_JEFE_AREA,
         verbose_name="Estado"
+    )
+    
+    # Validación del Jefe de Área (NUEVO PASO)
+    jefe_area = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='solicitudes_aprobadas_jefe',
+        verbose_name="Jefe de Área que Aprueba"
+    )
+    
+    fecha_aprobacion_jefe = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Fecha Aprobación Jefe"
+    )
+    
+    comentario_jefe = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name="Comentario del Jefe de Área"
     )
     
     # Validación de Abastecimiento (HU12)
@@ -102,9 +127,26 @@ class Solicitud(BaseModel):
         verbose_name="Comentario Financiero"
     )
     
-    presupuesto_aprobado = models.BooleanField(
-        default=False,
+    # 🆕 ACTUALIZADO: Monto de presupuesto aprobado (HU13)
+    presupuesto_aprobado = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
         verbose_name="Presupuesto Aprobado"
+    )
+    
+    # 🆕 NUEVO: Forma de pago preferida por empresa (HU15)
+    FORMA_PAGO_CHOICES = [
+        ('inmediato', 'Pago Inmediato'),
+        ('credito', 'Pago a Crédito'),
+        ('diferido', 'Pago Diferido'),
+    ]
+    
+    forma_pago_preferida = models.CharField(
+        max_length=20,
+        choices=FORMA_PAGO_CHOICES,
+        default='inmediato',
+        verbose_name="Forma de Pago Preferida"
     )
     
     monto_total = models.DecimalField(
@@ -147,6 +189,58 @@ class Solicitud(BaseModel):
         self.monto_total = total
         self.save(update_fields=['monto_total'])
         return total
+    
+    def aprobar_por_jefe(self, jefe_usuario, comentario=""):
+        """Aprueba la solicitud por el jefe de área"""
+        self.jefe_area = jefe_usuario
+        self.fecha_aprobacion_jefe = timezone.now()
+        self.comentario_jefe = comentario
+        self.estado = self.EstadoSolicitud.PENDIENTE_ABASTECIMIENTO
+        self.save()
+    
+    def rechazar_por_jefe(self, jefe_usuario, comentario=""):
+        """Rechaza la solicitud por el jefe de área"""
+        self.jefe_area = jefe_usuario
+        self.fecha_aprobacion_jefe = timezone.now()
+        self.comentario_jefe = comentario
+        self.estado = self.EstadoSolicitud.RECHAZADA_JEFE_AREA
+        self.save()
+    
+    def aprobar_abastecimiento(self, validador_usuario, comentario=""):
+        """Aprueba por validador de abastecimiento"""
+        self.validador_abastecimiento = validador_usuario
+        self.fecha_validacion_abastecimiento = timezone.now()
+        self.comentario_abastecimiento = comentario
+        self.stock_validado = True
+        self.estado = self.EstadoSolicitud.PENDIENTE_FINANZAS
+        self.save()
+    
+    def rechazar_abastecimiento(self, validador_usuario, comentario=""):
+        """Rechaza por validador de abastecimiento"""
+        self.validador_abastecimiento = validador_usuario
+        self.fecha_validacion_abastecimiento = timezone.now()
+        self.comentario_abastecimiento = comentario
+        self.stock_validado = False
+        self.estado = self.EstadoSolicitud.RECHAZADA_ABASTECIMIENTO
+        self.save()
+    
+    def aprobar_finanzas(self, validador_usuario, comentario=""):
+        """Aprueba por validador financiero"""
+        self.validador_finanzas = validador_usuario
+        self.fecha_validacion_finanzas = timezone.now()
+        self.comentario_finanzas = comentario
+        self.presupuesto_aprobado = True
+        self.estado = self.EstadoSolicitud.APROBADA
+        self.save()
+    
+    def rechazar_finanzas(self, validador_usuario, comentario=""):
+        """Rechaza por validador financiero"""
+        self.validador_finanzas = validador_usuario
+        self.fecha_validacion_finanzas = timezone.now()
+        self.comentario_finanzas = comentario
+        self.presupuesto_aprobado = False
+        self.estado = self.EstadoSolicitud.RECHAZADA_FINANZAS
+        self.save()
 
 
 class ItemSolicitud(BaseModel):

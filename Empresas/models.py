@@ -47,6 +47,12 @@ class Area(BaseModel):
         verbose_name="Jefe de área",
         help_text="Usuario jefe de esta área (debe pertenecer a la misma empresa)."
     )
+    
+    es_area_base = models.BooleanField(
+        default=False,
+        verbose_name="¿Es área base?",
+        help_text="Indica si esta área fue creada automáticamente como área base (Abastecimiento/Finanzas)."
+    )
 
     class Meta:
         verbose_name = "Área"
