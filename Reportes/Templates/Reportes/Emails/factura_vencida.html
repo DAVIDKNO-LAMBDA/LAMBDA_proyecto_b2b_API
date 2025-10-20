@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Factura Vencida - Lambda Commerce Solutions</title>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            line-height: 1.6; 
+            color: #333; 
+            background-color: #f8f9fa;
+            margin: 0;
+            padding: 0;
+        }
+        .container { 
+            max-width: 600px; 
+            margin: 0 auto; 
+            background: white; 
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        .header { 
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); 
+            color: white; 
+            padding: 40px 30px;
+            text-align: center;
+        }
+        .header h1 { 
+            margin: 0; 
+            font-size: 28px; 
+            font-weight: 600;
+        }
+        .header p { 
+            margin: 10px 0 0 0; 
+            opacity: 0.9;
+            font-size: 16px;
+        }
+        .content { 
+            padding: 40px 30px; 
+        }
+        .alert-box {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 25px 0;
+            border-left: 4px solid #dc3545;
+        }
+        .alert-box h3 {
+            color: #721c24;
+            margin: 0 0 15px 0;
+            font-size: 18px;
+        }
+        .invoice-summary {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 25px;
+            margin: 25px 0;
+            border-left: 4px solid #dc3545;
+        }
+        .invoice-summary h3 {
+            color: #dc3545;
+            margin: 0 0 15px 0;
+            font-size: 18px;
+        }
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+            padding: 5px 0;
+        }
+        .summary-row strong {
+            color: #2c3e50;
+        }
+        .overdue-row {
+            background: #f8d7da;
+            border-radius: 6px;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #f5c6cb;
+        }
+        .total-row {
+            border-top: 2px solid #dc3545;
+            padding-top: 10px;
+            margin-top: 15px;
+            font-weight: bold;
+            font-size: 18px;
+            color: #dc3545;
+        }
+        .button { 
+            display: inline-block; 
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); 
+            color: white; 
+            padding: 14px 30px; 
+            text-decoration: none; 
+            border-radius: 8px; 
+            font-weight: 600;
+            text-align: center;
+            margin: 20px 0;
+            transition: all 0.3s ease;
+        }
+        .button.secondary { 
+            background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%); 
+        }
+        .info-box {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .info-box h4 {
+            color: #856404;
+            margin: 0 0 10px 0;
+        }
+        .footer { 
+            background: #2c3e50; 
+            color: white; 
+            padding: 30px; 
+            text-align: center; 
+            font-size: 14px;
+        }
+        .footer a { 
+            color: #74b9ff; 
+            text-decoration: none;
+        }
+        .contact-urgente {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .contact-urgente h4 {
+            color: #0c5460;
+            margin: 0 0 15px 0;
+        }
+        .dias-vencido {
+            font-size: 24px;
+            font-weight: bold;
+            color: #dc3545;
+            text-align: center;
+            background: #f8d7da;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚠️ Factura Vencida</h1>
+            <p>Acción Inmediata Requerida</p>
+        </div>
+        
+        <div class="content">
+            <p>Estimado/a <strong>{{ nombre_contacto }}</strong>,</p>
+            
+            <div class="alert-box">
+                <h3>🚨 NOTIFICACIÓN IMPORTANTE</h3>
+                <p>Le informamos que la siguiente factura se encuentra <strong>VENCIDA</strong> y requiere atención inmediata para evitar afectaciones en su cuenta y futuros pedidos.</p>
+            </div>
+
+            <div class="dias-vencido">
+                📅 {{ dias_vencido }} días de retraso
+            </div>
+            
+            <div class="invoice-summary">
+                <h3>📋 Detalles de Factura Vencida</h3>
+                <div class="summary-row">
+                    <span><strong>Número de Factura:</strong></span>
+                    <span>{{ numero_factura }}</span>
+                </div>
+                <div class="summary-row">
+                    <span><strong>Pedido Relacionado:</strong></span>
+                    <span>{{ numero_pedido }}</span>
+                </div>
+                <div class="summary-row">
+                    <span><strong>Fecha de Emisión:</strong></span>
+                    <span>{{ fecha_emision }}</span>
+                </div>
+                <div class="overdue-row">
+                    <div class="summary-row">
+                        <span><strong>Fecha de Vencimiento:</strong></span>
+                        <span>{{ fecha_vencimiento }}</span>
+                    </div>
+                </div>
+                <div class="summary-row total-row">
+                    <span><strong>Monto Adeudado:</strong></span>
+                    <span>${{ total|floatformat:2 }}</span>
+                </div>
+            </div>
+
+            <div class="info-box">
+                <h4>⏰ Acciones Requeridas</h4>
+                <ul>
+                    <li><strong>Procese el pago inmediatamente</strong> para evitar intereses por mora</li>
+                    <li><strong>Verifique los métodos de pago disponibles</strong> en nuestro portal</li>
+                    <li><strong>Contacte a nuestro equipo</strong> si existe algún inconveniente</li>
+                    <li><strong>Conserve el comprobante de pago</strong> para sus registros</li>
+                </ul>
+            </div>
+
+            <center>
+                <a href="{{ enlace_portal }}" class="button">💳 Procesar Pago Ahora</a>
+                <br>
+                <a href="{{ enlace_factura }}" class="button secondary">📄 Descargar Factura</a>
+            </center>
+
+            <div class="contact-urgente">
+                <h4>📞 ¿Necesita Asistencia Inmediata?</h4>
+                <p><strong>Línea Directa de Cobranzas:</strong></p>
+                <p>📧 cobranzas@lambdacommerce.com</p>
+                <p>📞 +1 (555) 123-4567 Ext. 200</p>
+                <p>⏰ Lunes a Viernes: 8:00 AM - 6:00 PM</p>
+            </div>
+
+            <div class="alert-box">
+                <h3>⚠️ Importantes Consideraciones</h3>
+                <ul>
+                    <li>Pasados <strong>30 días de vencimiento</strong>, se aplicarán intereses por mora</li>
+                    <li>Su cuenta podría ser <strong>suspendida temporalmente</strong> para nuevos pedidos</li>
+                    <li>Los pagos atrasados afectan su <strong>historial crediticio</strong> con Lambda</li>
+                    <li>Se podrían aplicar <strong>gastos administrativos adicionales</strong></li>
+                </ul>
+            </div>
+
+            <p>Entendemos que pueden surgir situaciones imprevistas. Si enfrenta dificultades para realizar el pago, por favor contacte a nuestro equipo de cobranzas para explorar opciones de pago.</p>
+            
+            <p>Agradecemos su pronta respuesta y su continua confianza en Lambda Commerce Solutions.</p>
+            
+            <p>Atentamente,<br>
+            <strong>Departamento de Cobranzas</strong><br>
+            Lambda Commerce Solutions</p>
+        </div>
+        
+        <div class="footer">
+            <p><strong>Lambda Commerce Solutions - Departamento de Cobranzas</strong></p>
+            <p>📧 cobranzas@lambdacommerce.com | 📞 +1 (555) 123-4567</p>
+            <p>🌐 <a href="https://lambdacommerce.com">www.lambdacommerce.com</a></p>
+            <p style="margin-top: 20px; font-size: 12px; opacity: 0.8;">
+                Este es un correo automático del sistema de cobranzas.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

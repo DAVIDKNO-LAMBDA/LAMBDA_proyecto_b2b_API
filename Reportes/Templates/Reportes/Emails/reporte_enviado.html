@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reporte Periódico - Lambda Commerce Solutions</title>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            line-height: 1.6; 
+            color: #333; 
+            background-color: #f8f9fa;
+            margin: 0;
+            padding: 0;
+        }
+        .container { 
+            max-width: 650px; 
+            margin: 0 auto; 
+            background: white; 
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        .header { 
+            background: linear-gradient(135deg, #17a2b8 0%, #138496 100%); 
+            color: white; 
+            padding: 40px 30px;
+            text-align: center;
+        }
+        .header h1 { 
+            margin: 0; 
+            font-size: 28px; 
+            font-weight: 600;
+        }
+        .header p { 
+            margin: 10px 0 0 0; 
+            opacity: 0.9;
+            font-size: 16px;
+        }
+        .content { 
+            padding: 40px 30px; 
+        }
+        .report-summary {
+            background: #e8f4f8;
+            border-radius: 8px;
+            padding: 25px;
+            margin: 25px 0;
+            border-left: 4px solid #17a2b8;
+        }
+        .report-summary h3 {
+            color: #17a2b8;
+            margin: 0 0 15px 0;
+            font-size: 18px;
+        }
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+            padding: 5px 0;
+        }
+        .summary-row strong {
+            color: #2c3e50;
+        }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .metric-card {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+        }
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #17a2b8;
+            margin: 10px 0;
+        }
+        .metric-label {
+            font-size: 14px;
+            color: #6c757d;
+            margin: 0;
+        }
+        .button { 
+            display: inline-block; 
+            background: linear-gradient(135deg, #17a2b8 0%, #138496 100%); 
+            color: white; 
+            padding: 14px 30px; 
+            text-decoration: none; 
+            border-radius: 8px; 
+            font-weight: 600;
+            text-align: center;
+            margin: 20px 0;
+            transition: all 0.3s ease;
+        }
+        .info-box {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .info-box h4 {
+            color: #155724;
+            margin: 0 0 10px 0;
+        }
+        .chart-placeholder {
+            background: #f8f9fa;
+            border: 2px dashed #dee2e6;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            margin: 20px 0;
+            color: #6c757d;
+        }
+        .footer { 
+            background: #2c3e50; 
+            color: white; 
+            padding: 30px; 
+            text-align: center; 
+            font-size: 14px;
+        }
+        .footer a { 
+            color: #74b9ff; 
+            text-decoration: none;
+        }
+        .period-badge {
+            background: #17a2b8;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            display: inline-block;
+            margin: 10px 0;
+        }
+        .comparison-box {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .comparison-box h4 {
+            color: #856404;
+            margin: 0 0 15px 0;
+        }
+        .trend-positive {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .trend-negative {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .trend-neutral {
+            color: #6c757d;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Reporte Periódico</h1>
+            <p>Lambda Commerce Solutions</p>
+        </div>
+        
+        <div class="content">
+            <p>Estimado/a <strong>{{ nombre_contacto }}</strong>,</p>
+            
+            <p>Adjunto encontrará su reporte periódico correspondiente al período especificado. Este documento contiene un análisis detallado de las métricas de su cuenta y actividad comercial.</p>
+            
+            <div class="period-badge">
+                📅 {{ tipo_periodo|title }}: {{ fecha_inicio }} - {{ fecha_fin }}
+            </div>
+
+            <div class="report-summary">
+                <h3>📈 Resumen Ejecutivo</h3>
+                <div class="summary-row">
+                    <span><strong>Fecha de Generación:</strong></span>
+                    <span>{{ fecha_generacion }}</span>
+                </div>
+                <div class="summary-row">
+                    <span><strong>Tipo de Reporte:</strong></span>
+                    <span>{{ tipo_reporte|title }}</span>
+                </div>
+                <div class="summary-row">
+                    <span><strong>Empresa:</strong></span>
+                    <span>{{ empresa_nombre }}</span>
+                </div>
+                <div class="summary-row">
+                    <span><strong>Estado del Reporte:</strong></span>
+                    <span>{{ estado|title }}</span>
+                </div>
+            </div>
+
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-value">{{ total_pedidos }}</div>
+                    <div class="metric-label">Total Pedidos</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">${{ total_ventas|floatformat:0 }}</div>
+                    <div class="metric-label">Total Ventas</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">{{ total_productos }}</div>
+                    <div class="metric-label">Productos Únicos</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">${{ promedio_pedido|floatformat:0 }}</div>
+                    <div class="metric-label">Promedio por Pedido</div>
+                </div>
+            </div>
+
+            {% if comparacion_periodo_anterior %}
+            <div class="comparison-box">
+                <h4>📊 Comparación con Período Anterior</h4>
+                <div class="summary-row">
+                    <span>Variación en Pedidos:</span>
+                    <span class="{% if variacion_pedidos > 0 %}trend-positive{% elif variacion_pedidos < 0 %}trend-negative{% else %}trend-neutral{% endif %}">
+                        {% if variacion_pedidos > 0 %}+{% endif %}{{ variacion_pedidos|floatformat:1 }}%
+                    </span>
+                </div>
+                <div class="summary-row">
+                    <span>Variación en Ventas:</span>
+                    <span class="{% if variacion_ventas > 0 %}trend-positive{% elif variacion_ventas < 0 %}trend-negative{% else %}trend-neutral{% endif %}">
+                        {% if variacion_ventas > 0 %}+{% endif %}{{ variacion_ventas|floatformat:1 }}%
+                    </span>
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="info-box">
+                <h4>📋 Contenido del Reporte</h4>
+                <ul>
+                    <li><strong>Análisis de Ventas:</strong> Desglose detallado por productos y categorías</li>
+                    <li><strong>Tendencias Temporales:</strong> Gráficos de evolución durante el período</li>
+                    <li><strong>Métricas de Rendimiento:</strong> KPIs clave de su actividad comercial</li>
+                    <li><strong>Comparativas:</strong> Análisis vs períodos anteriores</li>
+                    <li><strong>Proyecciones:</strong> Estimaciones para próximos períodos</li>
+                    <li><strong>Recomendaciones:</strong> Sugerencias para optimización</li>
+                </ul>
+            </div>
+
+            <div class="chart-placeholder">
+                <p>📊 <strong>Gráficos y Análisis Detallado</strong></p>
+                <p>Consulte el archivo PDF adjunto para visualizar los gráficos completos, tablas detalladas y análisis profundo de sus métricas comerciales.</p>
+            </div>
+
+            <center>
+                <a href="{{ enlace_portal }}" class="button">🌐 Ver Reportes en Portal</a>
+            </center>
+
+            <div class="info-box">
+                <h4>🔄 Configuración de Reportes</h4>
+                <p>Este reporte se genera automáticamente según su configuración actual:</p>
+                <ul>
+                    <li><strong>Frecuencia:</strong> {{ frecuencia|title }}</li>
+                    <li><strong>Próximo Reporte:</strong> {{ proxima_generacion }}</li>
+                    <li><strong>Formatos:</strong> PDF, Excel (según configuración)</li>
+                </ul>
+                <p>Puede modificar estas configuraciones desde su panel de control en el portal B2B.</p>
+            </div>
+
+            <p>Este reporte le proporciona una visión integral de su actividad comercial y le ayuda a tomar decisiones estratégicas informadas.</p>
+            
+            <p>Si tiene alguna pregunta sobre los datos presentados o necesita información adicional, no dude en contactar a nuestro equipo de análisis.</p>
+            
+            <p>Cordialmente,<br>
+            <strong>Equipo de Business Intelligence</strong><br>
+            Lambda Commerce Solutions</p>
+        </div>
+        
+        <div class="footer">
+            <p><strong>Lambda Commerce Solutions - Business Intelligence</strong></p>
+            <p>📧 reportes@lambdacommerce.com | 📞 +1 (555) 123-4567</p>
+            <p>🌐 <a href="https://lambdacommerce.com">www.lambdacommerce.com</a></p>
+            <p style="margin-top: 20px; font-size: 12px; opacity: 0.8;">
+                Reporte generado automáticamente por el sistema Lambda BI.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

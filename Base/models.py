@@ -24,12 +24,15 @@ def guardar_archivo(instance, filename):
     return normalized_path
 
 class BaseModel(models.Model):
-    creado = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de creación")
-    modificado = models.DateTimeField(auto_now=True, verbose_name="Fecha de modificación")
-    estado = models.BooleanField(default=True, verbose_name="Estado")
-
+    """Modelo base con campos comunes para todos los modelos"""
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de creación")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Fecha de actualización")
+    deleted_at = models.DateTimeField(null=True, blank=True, verbose_name="Fecha de eliminación")
+    
     class Meta:
-        abstract = True
+        abstract = True  # ← IMPORTANTE: Debe ser abstract=True
+        # ❌ QUITAR ESTA LÍNEA:
+        # ordering = ['-created_at']
         
     @property
     def get_estado(self):
@@ -49,6 +52,7 @@ class DatoArchivo(BaseModel):
         verbose_name = "Archivo"
         verbose_name_plural = "Archivos"
         db_table = "archivos"
+        ordering = ['-created_at']  # ✅ MOVER EL ORDERING AQUÍ si lo necesitas
 
     def __str__(self):
         """

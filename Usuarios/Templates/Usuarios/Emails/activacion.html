@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Activación de Cuenta</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7fa;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 40px auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+        }
+        .content {
+            padding: 30px;
+        }
+        .info-box {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-left: 4px solid #667eea;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .info-box h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .info-box ul {
+            list-style: none;
+            padding: 0;
+        }
+        .info-box li {
+            padding: 8px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .info-box li:last-child {
+            border-bottom: none;
+        }
+        .btn {
+            display: inline-block;
+            padding: 15px 40px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white !important;
+            text-decoration: none;
+            border-radius: 50px;
+            margin: 20px 0;
+            font-weight: bold;
+            text-align: center;
+        }
+        .btn:hover {
+            opacity: 0.9;
+        }
+        .link-box {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            word-break: break-all;
+            font-size: 12px;
+            color: #666;
+            margin: 20px 0;
+        }
+        .footer {
+            margin-top: 30px;
+            padding: 20px 30px;
+            background-color: #f8f9fa;
+            border-top: 1px solid #e0e0e0;
+            color: #666;
+            font-size: 12px;
+            text-align: center;
+        }
+        .warning {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎉 ¡Bienvenido!</h1>
+        </div>
+        
+        <div class="content">
+            <p style="font-size: 16px;">Hola <strong>{{ nombre_usuario }}</strong>,</p>
+            
+            <p>{{ creador }} te ha creado una cuenta en el sistema de gestión de pedidos B2B de <strong>{{ empresa }}</strong>.</p>
+            
+            <div class="info-box">
+                <h3>📋 Información de tu cuenta</h3>
+                <ul>
+                    <li><strong>Empresa:</strong> {{ empresa }}</li>
+                    <li><strong>Área:</strong> {{ area }}</li>
+                    <li><strong>Cargo:</strong> {{ cargo }}</li>
+                    <li><strong>Email:</strong> {{ email }}</li>
+                </ul>
+            </div>
+            
+            <p>Para activar tu cuenta y establecer tu contraseña, haz clic en el siguiente botón:</p>
+            
+            <div style="text-align: center;">
+                <a href="{{ url_activacion }}" class="btn">✅ Activar mi cuenta</a>
+            </div>
+            
+            <p style="font-size: 14px; color: #666;">Si el botón no funciona, copia y pega este enlace en tu navegador:</p>
+            <div class="link-box">
+                {{ url_activacion }}
+            </div>
+            
+            <div class="warning">
+                <strong>⏰ Nota importante:</strong> Este enlace de activación es válido por 48 horas. Después de ese tiempo deberás solicitar un nuevo enlace.
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p><strong>Lambda Commerce Solutions</strong></p>
+            <p>Sistema B2B de Gestión de Pedidos</p>
+            <p style="margin-top: 15px;">Si no solicitaste esta cuenta, puedes ignorar este correo de forma segura.</p>
+        </div>
+    </div>
+</body>
+</html>
